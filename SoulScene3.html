@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SoulScene — Create what you need to feel</title>
+<style>
+  /* ============================================================
+     SoulScene — two-persona click-path prototype (concept demo)
+     Persona A · Viewer  : mood -> generate & deliver a scene
+     Persona B · Creator : setup -> generate a <=5 min short film -> publish
+     Brand palette from deck: midnight indigo #1B1B3A + gold #C9A227
+     All "AI generation" is mocked / pre-baked to show the vision.
+     ============================================================ */
+  :root{
+    --bg:#0C0C22; --bg2:#141433;
+    --panel:rgba(36,36,66,.55); --panel-solid:#20203C;
+    --line:rgba(207,207,232,.14); --line-2:rgba(207,207,232,.28);
+    --text:#F4F3F9; --muted:#9A9AC0; --lav:#CFCFE8;
+    --gold:#C9A227; --gold-2:#E7C662; --gold-soft:rgba(201,162,39,.16);
+    --mood-a:#2E3A8A; --mood-b:#12173A; --glow:#7B8FFF; --accent:#AEB9FF;
+    --radius:18px; --maxw:1140px;
+    --serif:"Georgia","Iowan Old Style","Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --ease:cubic-bezier(.22,.61,.36,1);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.55}
+  /* ambient */
+  #sky{position:fixed;inset:0;z-index:0;overflow:hidden;background:radial-gradient(120% 90% at 50% -10%,var(--bg2),var(--bg) 60%)}
+  .aurora{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;transition:background 1.2s var(--ease),opacity 1.2s var(--ease);mix-blend-mode:screen}
+  #a1{width:60vw;height:60vw;left:-15vw;top:-20vw;background:radial-gradient(circle,var(--glow),transparent 65%);animation:d1 26s ease-in-out infinite}
+  #a2{width:55vw;height:55vw;right:-18vw;top:-10vw;background:radial-gradient(circle,var(--mood-a),transparent 65%);animation:d2 32s ease-in-out infinite}
+  #a3{width:70vw;height:70vw;left:20vw;bottom:-40vw;background:radial-gradient(circle,var(--accent),transparent 60%);opacity:.28;animation:d3 38s ease-in-out infinite}
+  @keyframes d1{50%{transform:translate(8vw,6vw) scale(1.1)}}
+  @keyframes d2{50%{transform:translate(-6vw,8vw) scale(1.08)}}
+  @keyframes d3{50%{transform:translate(4vw,-6vw) scale(1.12)}}
+  #stars{position:absolute;inset:0}
+  .star{position:absolute;border-radius:50%;background:#fff;animation:tw 4s ease-in-out infinite}
+  @keyframes tw{0%,100%{opacity:.2}50%{opacity:.9}}
+  #grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.05;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  /* header */
+  header{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px clamp(16px,4vw,40px);backdrop-filter:blur(10px);background:linear-gradient(var(--bg),rgba(12,12,34,.2));border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:11px;cursor:pointer;user-select:none;flex:none}
+  .mark{width:30px;height:30px}.mark svg{width:100%;height:100%;display:block}
+  .wordmark{font-family:var(--serif);font-size:20px;letter-spacing:.02em}.wordmark b{color:var(--gold-2);font-weight:400}
+  .steps{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted);flex:1;justify-content:center}
+  .steps .s{display:flex;align-items:center;gap:7px;opacity:.5;transition:.4s}
+  .steps .s .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:.4s}
+  .steps .s.done .dot{background:var(--gold)}
+  .steps .s.active{opacity:1;color:var(--text)}
+  .steps .s.active .dot{background:var(--glow);box-shadow:0 0 0 4px color-mix(in srgb,var(--glow) 30%,transparent)}
+  .steps .sep{width:16px;height:1px;background:var(--line-2)}
+  .hbtns{display:flex;gap:9px;align-items:center;flex:none}
+  .modepill{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--lav);border:1px solid var(--line-2);padding:6px 12px;border-radius:100px;white-space:nowrap;display:flex;gap:7px;align-items:center}
+  .modepill i{width:7px;height:7px;border-radius:50%;background:var(--glow);display:inline-block}
+  .ghostbtn{background:none;border:1px solid var(--line);color:var(--lav);padding:7px 13px;border-radius:100px;font-size:12px;cursor:pointer;transition:.2s;font-family:var(--sans);white-space:nowrap}
+  .ghostbtn:hover{border-color:var(--line-2);background:rgba(255,255,255,.04)}
+  @media(max-width:860px){.steps{display:none}.wordmark{display:none}}
+
+  /* layout */
+  main{position:relative;z-index:10;max-width:var(--maxw);margin:0 auto;padding:clamp(24px,5vw,52px) clamp(16px,4vw,40px) 92px}
+  .screen{display:none;animation:rise .7s var(--ease) both}
+  .screen.active{display:block}
+  @keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+  .eyebrow{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--glow);margin-bottom:14px;font-weight:600}
+  h1.big{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5vw,50px);line-height:1.08;margin:0 0 14px}
+  .sub{color:var(--lav);font-size:clamp(15px,1.6vw,18px);max-width:660px;margin:0 0 30px}
+  .cta{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(100deg,var(--gold),var(--gold-2));color:#241c02;border:none;font-weight:700;font-size:15px;padding:15px 26px;border-radius:100px;cursor:pointer;font-family:var(--sans);transition:.25s var(--ease);box-shadow:0 10px 30px -8px rgba(201,162,39,.5)}
+  .cta:hover{transform:translateY(-2px);box-shadow:0 16px 40px -10px rgba(201,162,39,.65)}
+  .cta:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.6);box-shadow:none;transform:none}
+  .navrow{display:flex;align-items:center;gap:14px;margin-top:34px;flex-wrap:wrap}
+  .backlink{color:var(--muted);background:none;border:none;cursor:pointer;font-size:14px;font-family:var(--sans);padding:8px 0}
+  .backlink:hover{color:var(--lav)}
+  .hint{color:var(--muted);font-size:13px}
+  .footline{position:fixed;bottom:0;left:0;right:0;z-index:15;text-align:center;font-size:11px;color:var(--muted);padding:9px;background:linear-gradient(transparent,var(--bg) 60%);pointer-events:none}
+
+  /* cards */
+  .grid{display:grid;gap:14px}
+  .card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;cursor:pointer;transition:.25s var(--ease);backdrop-filter:blur(8px);overflow:hidden}
+  .card:hover{transform:translateY(-3px);border-color:var(--line-2);background:rgba(48,48,84,.6)}
+  .card.sel{border-color:var(--glow);background:color-mix(in srgb,var(--glow) 12%,var(--panel))}
+  .card.sel::after{content:"✓";position:absolute;top:12px;right:14px;width:22px;height:22px;border-radius:50%;background:var(--glow);color:#0C0C22;font-size:13px;font-weight:800;display:grid;place-items:center}
+  .card.locked{cursor:default}
+  .card .ttl{font-size:16px;font-weight:600;margin:0 0 4px}
+  .card .desc{font-size:13px;color:var(--muted);margin:0}
+  .orb{width:44px;height:44px;border-radius:50%;margin-bottom:14px;box-shadow:inset 0 0 12px rgba(255,255,255,.25)}
+
+  /* persona chooser */
+  .chooser{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:26px}
+  @media(max-width:760px){.chooser{grid-template-columns:1fr}}
+  .persona{padding:34px 30px;min-height:280px;display:flex;flex-direction:column;justify-content:space-between}
+  .persona .pico{width:58px;height:58px;border-radius:16px;display:grid;place-items:center;font-size:26px;background:var(--gold-soft);color:var(--gold-2);margin-bottom:20px}
+  .persona h3{font-family:var(--serif);font-size:26px;margin:0 0 10px;font-weight:400}
+  .persona p{color:var(--lav);margin:0 0 22px;font-size:15px}
+  .persona .plist{list-style:none;padding:0;margin:0 0 24px;color:var(--muted);font-size:13px}
+  .persona .plist li{padding:5px 0 5px 22px;position:relative}
+  .persona .plist li::before{content:"◆";position:absolute;left:0;color:var(--glow);font-size:9px;top:8px}
+  .persona .enter{display:inline-flex;align-items:center;gap:9px;color:var(--gold-2);font-weight:600;font-size:15px}
+  .persona.creator .pico{background:color-mix(in srgb,var(--glow) 16%,transparent);color:var(--glow)}
+
+  /* home concierge bits */
+  .hero{max-width:780px}
+  .moodbar{display:flex;gap:10px;margin:6px 0 18px;max-width:660px}
+  .moodbar input{flex:1;font-size:15px;padding:15px 18px}
+  .moodbar .cta{white-space:nowrap;padding:15px 22px}
+  @media(max-width:560px){.moodbar{flex-direction:column}}
+  .qmoods{display:flex;flex-wrap:wrap;gap:9px}
+  .qchip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);color:var(--lav);padding:9px 14px;border-radius:100px;cursor:pointer;font-size:13px;transition:.2s var(--ease);font-family:var(--sans)}
+  .qchip:hover{border-color:var(--glow);color:#fff;transform:translateY(-1px)}
+  .browsetiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media(max-width:760px){.browsetiles{grid-template-columns:repeat(2,1fr)}}
+  .btile{border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:15px 16px;cursor:pointer;transition:.2s var(--ease);display:flex;align-items:center;gap:13px}
+  .btile:hover{transform:translateY(-2px);border-color:var(--line-2)}
+  .btile .be{font-size:22px;flex:none}
+  .btile .bl{font-size:14px;font-weight:600}.btile .bv{font-size:11px;color:var(--muted)}
+  .madestrip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  @media(max-width:760px){.madestrip{grid-template-columns:repeat(2,1fr)}}
+  .madecard{border:1px solid var(--line);background:var(--panel);border-radius:14px;overflow:hidden;cursor:pointer;transition:.2s var(--ease)}
+  .madecard:hover{transform:translateY(-3px);border-color:var(--line-2)}
+  .madecard .th{aspect-ratio:16/9}.madecard .th svg{width:100%;height:100%;display:block}
+  .madecard .mc{padding:12px 14px}.madecard .mt{font-family:var(--serif);font-size:15px;margin:0 0 8px}
+  .madecard .tags{display:flex;gap:6px;flex-wrap:wrap}
+  .section-h .lite{color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0}
+  .persona.mini{min-height:0;padding:24px}
+  /* fast-create modes */
+  .mixwrap{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}
+  @media(max-width:820px){.mixwrap{grid-template-columns:1fr}}
+  .mixrow{display:grid;grid-template-columns:96px 1fr 42px;align-items:center;gap:12px;margin:14px 0}
+  .mixl{font-size:13px;color:var(--lav)}
+  .mixv{font-size:13px;color:var(--gold-2);text-align:right;font-variant-numeric:tabular-nums}
+  .mixreadout{margin-top:18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--lav);font-size:14px;line-height:1.9}
+  .rerank{display:flex;flex-direction:column;gap:10px}
+  .rritem{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:12px;padding:8px;background:var(--panel);transition:.35s var(--ease)}
+  .rrth{width:78px;aspect-ratio:16/9;border-radius:7px;overflow:hidden;flex:none}.rrth svg{width:100%;height:100%;display:block}
+  .rrt{font-size:13px;font-weight:600}.rrm{font-size:11px;color:var(--muted)}
+  .rrscore{margin-left:auto;font-size:13px;color:var(--gold-2);font-variant-numeric:tabular-nums}
+  .slots{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+  @media(max-width:760px){.slots{grid-template-columns:repeat(2,1fr)}}
+  .slot{border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:18px 14px;text-align:center;cursor:pointer;transition:.2s var(--ease);position:relative}
+  .slot:hover{transform:translateY(-2px);border-color:var(--line-2)}
+  .slot.sel{border-color:var(--glow);background:color-mix(in srgb,var(--glow) 12%,var(--panel))}
+  .slot .semoji{font-size:26px;margin-bottom:8px}
+  .slot .sl{font-size:14px;font-weight:600}.slot .sr{font-size:11px;color:var(--muted);margin-top:3px}
+  .slot .snow{position:absolute;top:8px;right:8px;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#0C0C22;background:var(--gold-2);padding:2px 7px;border-radius:100px;font-weight:700}
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:640px){.twocol{grid-template-columns:1fr}}
+  /* pricing */
+  .pricehero{max-width:720px}
+  .billtoggle{display:inline-flex;background:var(--panel);border:1px solid var(--line);border-radius:100px;padding:4px;gap:4px;margin:2px 0 28px}
+  .billtoggle .bt{border:none;background:none;color:var(--muted);padding:9px 18px;border-radius:100px;cursor:pointer;font-size:13px;font-family:var(--sans);transition:.2s var(--ease)}
+  .billtoggle .bt.on{background:var(--glow);color:#0C0C22;font-weight:600}
+  .billtoggle .save{font-size:11px;color:var(--gold-2)}
+  .billtoggle .bt.on .save{color:#241c02}
+  .pricegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:start}
+  @media(max-width:820px){.pricegrid{grid-template-columns:1fr;max-width:460px}}
+  .plan{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:28px 24px;backdrop-filter:blur(8px);transition:.25s var(--ease)}
+  .plan.featured{border-color:var(--glow);box-shadow:0 0 55px -18px var(--glow)}
+  @media(min-width:821px){.plan.featured{transform:translateY(-8px)}}
+  .plan.picked{border-color:var(--gold-2);box-shadow:0 0 40px -18px var(--gold)}
+  .pbadge{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:linear-gradient(100deg,var(--gold),var(--gold-2));color:#241c02;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:5px 14px;border-radius:100px;white-space:nowrap}
+  .pname{font-family:var(--serif);font-size:24px}
+  .ptag{color:var(--muted);font-size:13px;margin-top:2px}
+  .pprice{margin:18px 0 2px;display:flex;align-items:baseline;gap:7px}
+  .pnum{font-family:var(--serif);font-size:42px;color:var(--text);line-height:1}
+  .punit{color:var(--muted);font-size:14px}
+  .psub{color:var(--muted);font-size:12px;min-height:16px}
+  .pmovies{margin:16px 0;padding:11px 14px;background:var(--gold-soft);border:1px solid var(--gold-soft);border-radius:10px;color:var(--gold-2);font-weight:600;font-size:14px;text-align:center}
+  .pcta{width:100%;justify-content:center;margin-bottom:6px}
+  .cta.ghost{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--line-2);box-shadow:none;font-weight:600}
+  .cta.ghost:hover{border-color:var(--glow);background:rgba(255,255,255,.08);box-shadow:none;transform:translateY(-2px)}
+  .pfeats{list-style:none;padding:0;margin:16px 0 0}
+  .pfeats li{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;color:var(--lav);padding:6px 0}
+  .pfeats li.lead{color:var(--muted);font-weight:600;border-top:1px solid var(--line);margin-top:6px;padding-top:14px}
+  .pfeats .pk{color:var(--glow);flex:none;font-weight:800}
+  .pricefoot{margin-top:28px;color:var(--muted);font-size:13px;text-align:center}
+  .pricingband{margin-top:36px;border:1px solid var(--line);border-radius:16px;padding:22px 24px;background:var(--panel);display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  .pbname{font-family:var(--serif);font-size:20px}
+  .pbsub{color:var(--muted);font-size:14px;margin-top:4px;max-width:540px}
+  /* youtube "delivered film" player */
+  .ytframe{position:absolute;inset:0;width:100%;height:100%;border:0;z-index:2;background:#000}
+  .player.playing .playbtn,.player.playing .cap,.player.playing .scrub{display:none}
+  .soulbadge{position:absolute;top:12px;left:12px;z-index:3;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#241c02;font-weight:700;background:linear-gradient(100deg,var(--gold),var(--gold-2));padding:5px 11px;border-radius:100px;box-shadow:0 4px 14px -4px rgba(0,0,0,.5)}
+  .player.playing .soulbadge{display:none}
+  a.ythref{border-color:var(--glow);color:#fff;background:color-mix(in srgb,var(--glow) 16%,transparent);text-decoration:none}
+  a.ythref:hover{background:color-mix(in srgb,var(--glow) 30%,transparent)}
+  .memtag.star{color:var(--accent);border-color:color-mix(in srgb,var(--glow) 35%,transparent);background:color-mix(in srgb,var(--glow) 14%,transparent)}
+  .topnav{display:flex;gap:2px;align-items:center}
+  .topnav a{color:var(--lav);font-size:13px;padding:7px 11px;border-radius:8px;cursor:pointer;transition:.2s var(--ease);white-space:nowrap}
+  .topnav a:hover{color:#fff;background:rgba(255,255,255,.06)}
+  @media(max-width:1000px){.topnav{display:none}}
+
+  /* feature + stats (landing) */
+  .feats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+  @media(max-width:760px){.feats{grid-template-columns:1fr}}
+  .feat{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:var(--panel)}
+  .feat .fi{color:var(--glow);margin-bottom:10px;font-size:18px}
+  .feat h4{margin:0 0 6px;font-size:15px}.feat p{margin:0;font-size:13px;color:var(--muted)}
+  .stat-row{display:flex;gap:28px;flex-wrap:wrap;margin-top:28px}
+  .stat b{display:block;font-family:var(--serif);font-size:28px;color:var(--gold-2);line-height:1}.stat span{font-size:12px;color:var(--muted)}
+
+  /* mood arc */
+  .arc{display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:start}
+  .arc .col h3{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 14px;font-weight:600}
+  .chips{display:flex;flex-wrap:wrap;gap:10px}
+  .chip{border:1px solid var(--line);background:var(--panel);color:var(--lav);padding:11px 16px;border-radius:100px;cursor:pointer;font-size:14px;transition:.2s var(--ease);font-family:var(--sans);backdrop-filter:blur(6px)}
+  .chip:hover{border-color:var(--line-2);color:var(--text)}
+  .chip.sel{background:color-mix(in srgb,var(--glow) 20%,transparent);border-color:var(--glow);color:#fff}
+  .arcarrow{align-self:center;font-size:30px;color:var(--glow);opacity:.7;padding-top:26px}
+  .moodgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .moodmini{display:flex;align-items:center;gap:12px;border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:12px 14px;cursor:pointer;transition:.2s var(--ease)}
+  .moodmini:hover{border-color:var(--line-2)}
+  .moodmini.sel{border-color:var(--glow);background:color-mix(in srgb,var(--glow) 12%,var(--panel))}
+  .moodmini .o{width:30px;height:30px;border-radius:50%;flex:none;box-shadow:inset 0 0 8px rgba(255,255,255,.3)}
+  .moodmini .l{font-size:14px;font-weight:600}.moodmini .v{font-size:11px;color:var(--muted)}
+  @media(max-width:760px){.arc{grid-template-columns:1fr}.arcarrow{transform:rotate(90deg);padding:0;justify-self:start}}
+
+  /* avatars / cast */
+  .avatar{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#0C0C22;font-size:15px;flex:none;box-shadow:inset 0 -6px 14px rgba(0,0,0,.25)}
+  .castcard{display:flex;align-items:center;gap:14px}.castcard .meta{min-width:0}
+  .memtag{display:inline-block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold-2);border:1px solid var(--gold-soft);background:var(--gold-soft);padding:2px 8px;border-radius:100px;margin-top:6px}
+  .addcard{border-style:dashed;display:flex;align-items:center;gap:14px}
+  .addcard .plus{width:52px;height:52px;border-radius:50%;border:1px dashed var(--line-2);display:grid;place-items:center;font-size:24px;color:var(--lav);flex:none}
+
+  /* studio form */
+  .studio{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:820px){.studio{grid-template-columns:1fr}}
+  .field{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+  .field.full{grid-column:1/-1}
+  .field label{display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:12px}
+  .field .fdesc{font-size:12px;color:var(--muted);margin:-6px 0 12px}
+  .chipgroup{display:flex;flex-wrap:wrap;gap:9px}
+  .chip.sm{padding:9px 13px;font-size:13px}
+  textarea,input[type=text]{width:100%;background:rgba(12,12,34,.5);border:1px solid var(--line-2);border-radius:12px;color:var(--text);font-family:var(--sans);font-size:14px;padding:12px 14px;resize:vertical}
+  textarea:focus,input[type=text]:focus{outline:none;border-color:var(--glow)}
+  .rangewrap{display:flex;align-items:center;gap:16px}
+  input[type=range]{-webkit-appearance:none;appearance:none;height:6px;border-radius:100px;background:linear-gradient(90deg,var(--glow),var(--gold-2));flex:1;outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid var(--gold-2);cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.4)}
+  input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid var(--gold-2);cursor:pointer}
+  .lenval{font-family:var(--serif);font-size:30px;color:var(--gold-2);min-width:78px;text-align:right}
+  .lenlab{font-size:11px;color:var(--muted);text-align:right}
+  .toggle{display:flex;align-items:center;gap:12px;cursor:pointer}
+  .tsw{width:44px;height:25px;border-radius:100px;background:var(--line-2);position:relative;transition:.25s;flex:none}
+  .tsw::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;transition:.25s}
+  .toggle.on .tsw{background:var(--glow)}.toggle.on .tsw::after{transform:translateX(19px)}
+  .castmini{display:flex;gap:8px;flex-wrap:wrap}
+  .castpick{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:100px;padding:5px 12px 5px 5px;cursor:pointer;font-size:13px;transition:.2s;background:var(--panel)}
+  .castpick .avatar{width:30px;height:30px;font-size:11px}
+  .castpick.sel{border-color:var(--glow);background:color-mix(in srgb,var(--glow) 14%,transparent)}
+
+  /* generation pipeline */
+  .pipe{display:grid;gap:12px;margin:30px 0}
+  .pipe.p4{grid-template-columns:repeat(4,1fr)}.pipe.p5{grid-template-columns:repeat(5,1fr)}
+  @media(max-width:760px){.pipe.p4,.pipe.p5{grid-template-columns:repeat(2,1fr)}}
+  .node{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 14px;text-align:center;transition:.5s var(--ease);position:relative;opacity:.45}
+  .node.on{opacity:1;border-color:var(--glow);box-shadow:0 0 40px -14px var(--glow)}
+  .node.done{opacity:1;border-color:var(--gold-soft)}
+  .node .ic{width:38px;height:38px;border-radius:11px;margin:0 auto 10px;display:grid;place-items:center;background:rgba(255,255,255,.05);color:var(--glow);font-size:17px}
+  .node.done .ic{color:var(--gold-2);background:var(--gold-soft)}
+  .node .nlab{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+  .node .ntt{font-size:13px;font-weight:600}
+  .node .spin{position:absolute;top:11px;right:11px;width:13px;height:13px;border:2px solid var(--line-2);border-top-color:var(--glow);border-radius:50%;animation:sp .7s linear infinite;display:none}
+  .node.on .spin{display:block}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .genbar{height:5px;background:var(--line);border-radius:100px;overflow:hidden;max-width:560px}
+  .genbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--glow),var(--gold-2));transition:width .4s linear}
+  .genstat{color:var(--lav);font-size:14px;margin:16px 0 6px;min-height:22px}
+  .ragnote{margin-top:24px;border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:var(--panel);display:flex;gap:14px;align-items:flex-start;max-width:660px;opacity:0;transition:opacity .6s}
+  .ragnote.show{opacity:1}
+  .rtag{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-2);font-weight:700}
+
+  /* player + scene */
+  .scenehero{display:grid;grid-template-columns:1.3fr 1fr;gap:32px;align-items:center}
+  @media(max-width:860px){.scenehero{grid-template-columns:1fr}}
+  .player{position:relative;border-radius:var(--radius);overflow:hidden;border:1px solid var(--line-2);box-shadow:0 30px 80px -30px #000;aspect-ratio:16/9}
+  .player svg{width:100%;height:100%;display:block}
+  .playbtn{position:absolute;inset:0;display:grid;place-items:center;cursor:pointer;background:rgba(12,12,34,.15);transition:.3s}
+  .playbtn:hover{background:rgba(12,12,34,.05)}
+  .playbtn .circ{width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,.14);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.4);display:grid;place-items:center;transition:.3s}
+  .playbtn:hover .circ{transform:scale(1.08);background:rgba(255,255,255,.22)}
+  .playbtn .circ svg{width:26px;height:26px;margin-left:4px}
+  .player .cap{position:absolute;left:0;right:0;bottom:0;padding:14px 16px;font-size:12px;color:#fff;background:linear-gradient(transparent,rgba(8,8,24,.85));display:flex;justify-content:space-between;align-items:center}
+  .scrub{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.2)}.scrub i{display:block;height:100%;width:0;background:var(--gold-2)}
+  .player.playing .playbtn .circ{opacity:0}
+  .badgeArc{display:inline-flex;align-items:center;gap:9px;font-size:13px;border:1px solid var(--line-2);border-radius:100px;padding:7px 15px;margin-bottom:16px;background:var(--panel)}
+  .badgeArc b{color:var(--glow)}
+  .metaRow{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .tag{font-size:12px;color:var(--lav);border:1px solid var(--line);border-radius:100px;padding:5px 12px;background:var(--panel)}
+  .tag.mood{border-color:var(--glow);color:#fff;background:color-mix(in srgb,var(--glow) 16%,transparent)}
+  .logline{color:var(--lav);font-size:16px;margin:18px 0 0;line-height:1.6}
+  .section-h{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:42px 0 16px;font-weight:600;display:flex;align-items:center;gap:10px}
+  .beats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:760px){.beats{grid-template-columns:1fr}}
+  .beat{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .beat .still{aspect-ratio:16/10}.beat .still svg{width:100%;height:100%;display:block}
+  .beat .bd{padding:15px 16px}
+  .beat .bn{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-2);margin-bottom:6px;display:flex;justify-content:space-between}
+  .beat .bt{font-size:15px;font-weight:600;margin:0 0 6px}.beat .bx{font-size:13px;color:var(--muted);margin:0}
+  .twoup{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.twoup{grid-template-columns:1fr}}
+  .info{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+  .info h4{margin:0 0 10px;font-size:14px;display:flex;align-items:center;gap:9px}.info p{margin:0;color:var(--lav);font-size:14px}
+  .castline{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}.castline .avatar{width:38px;height:38px;font-size:12px}
+  .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:38px}
+  .btn2{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--line-2);background:var(--panel);color:var(--text);padding:13px 20px;border-radius:100px;cursor:pointer;font-size:14px;font-family:var(--sans);transition:.2s var(--ease)}
+  .btn2:hover{border-color:var(--glow);background:rgba(255,255,255,.05)}.btn2 svg{width:16px;height:16px}
+  .btn2.primary{background:linear-gradient(100deg,var(--gold),var(--gold-2));color:#241c02;border:none;font-weight:700}
+
+  /* settings grid (studio output) */
+  .setgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:640px){.setgrid{grid-template-columns:1fr 1fr}}
+  .setcell{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .setcell .k{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .setcell .v{font-size:14px;font-weight:600;margin-top:4px}
+
+  /* deliver / cross-persona */
+  .deliver{margin-top:22px;border:1px solid var(--glow);border-radius:16px;padding:20px 22px;background:color-mix(in srgb,var(--glow) 8%,var(--panel));display:none}
+  .deliver.show{display:block;animation:rise .5s var(--ease)}
+  .deliver h4{margin:0 0 8px;font-size:16px}
+  .previewcard{display:flex;gap:14px;align-items:center;margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;max-width:460px}
+  .previewcard .th{width:110px;aspect-ratio:16/9;border-radius:8px;overflow:hidden;flex:none}
+  .previewcard .th svg{width:100%;height:100%;display:block}
+
+  /* memories */
+  .memgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+  .memcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .memcard .still{aspect-ratio:16/9}.memcard .still svg{width:100%;height:100%;display:block}
+  .memcard .mb{padding:14px 16px}.memcard .mt{font-family:var(--serif);font-size:17px;margin:0 0 6px}.memcard .mm{font-size:12px;color:var(--muted)}
+  .emptyMem{color:var(--muted);font-size:15px}
+
+  .toast{position:fixed;left:50%;bottom:36px;transform:translate(-50%,20px);z-index:60;background:var(--panel-solid);border:1px solid var(--line-2);border-radius:14px;padding:14px 20px;font-size:14px;display:flex;gap:11px;align-items:center;box-shadow:0 20px 50px -20px #000;opacity:0;pointer-events:none;transition:.4s var(--ease);max-width:90vw}
+  .toast.show{opacity:1;transform:translate(-50%,0)}.toast .tk{color:var(--gold-2)}
+</style>
+</head>
+<body>
+<div id="sky"><div class="aurora" id="a1"></div><div class="aurora" id="a2"></div><div class="aurora" id="a3"></div><div id="stars"></div></div>
+<div id="grain"></div>
+
+<header>
+  <div class="brand" onclick="goHome()">
+    <span class="mark"><svg viewBox="0 0 40 40" fill="none"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E7C662"/><stop offset="1" stop-color="#C9A227"/></linearGradient></defs><circle cx="20" cy="20" r="18" stroke="url(#g)" stroke-width="1.4" opacity=".5"/><path d="M20 7c3 5 3 8 0 13-3-5-3-8 0-13Z" fill="url(#g)"/><path d="M20 33c-3-5-3-8 0-13 3 5 3 8 0 13Z" fill="url(#g)" opacity=".7"/><circle cx="20" cy="20" r="2.6" fill="#fff"/></svg></span>
+    <span class="wordmark">Soul<b>Scene</b></span>
+  </div>
+  <nav class="topnav">
+    <a onclick="goHome()">Moods</a>
+    <a onclick="choose('creator')">Studio</a>
+    <a onclick="enterQuick('timeofday')">Right Now</a>
+    <a onclick="go('pricing')">Pricing</a>
+  </nav>
+  <nav class="steps" id="steps"></nav>
+  <div class="hbtns">
+    <span class="modepill" id="modePill" style="display:none"><i></i><span id="modeLabel"></span></span>
+    <button class="ghostbtn" id="memNav" style="display:none" onclick="go('memories')">☾ Memories</button>
+    <button class="ghostbtn" id="switchBtn" style="display:none" onclick="goHome()">⇄ Switch</button>
+  </div>
+</header>
+
+<main>
+  <!-- ============ HOME (mood-first concierge) ============ -->
+  <section class="screen active" id="chooser">
+    <div class="hero">
+      <div class="eyebrow">🎬 Your emotion-aware movie concierge</div>
+      <h1 class="big">Don't search for something to watch.<br><span style="color:var(--gold-2)">Create what you need to feel.</span></h1>
+      <p class="sub">Tell SoulScene how you feel — and instead of recommending an old film, it <b>creates an original movie for you</b>, on demand. Bring a mood, a storyline, your own actors, or all three.</p>
+      <div class="moodbar">
+        <input type="text" id="homePrompt" placeholder="Describe your mood, your night, or a storyline…" onkeydown="if(event.key==='Enter')createFromBar()">
+        <button class="cta" onclick="createFromBar()">Create my movie ✦</button>
+      </div>
+      <div class="qmoods" id="qmoods"></div>
+    </div>
+
+    <div class="section-h">Two ways to create <span class="lite">· both open to viewers &amp; creators</span></div>
+    <div class="chooser">
+      <div class="card persona viewer" onclick="choose('consumer')">
+        <div><div class="pico">⚡</div>
+          <h3>Quick create</h3>
+          <p>Start from a mood. SoulScene writes, casts, scores and delivers an original scene in minutes.</p>
+          <ul class="plist"><li>Set your emotional arc</li><li>Pick a world &amp; cast</li><li>Get your movie, instantly</li></ul>
+        </div>
+        <span class="enter">Start a quick create →</span>
+      </div>
+      <div class="card persona creator" onclick="choose('creator')">
+        <div><div class="pico">✦</div>
+          <h3>Full studio</h3>
+          <p>Bring your <b>storyline, actors and full setup</b> — produce a short film up to 5 minutes and publish it to the mood library.</p>
+          <ul class="plist"><li>Your storyline &amp; story seed</li><li>Your actors &amp; avatars</li><li>Style, length, score &amp; narration</li></ul>
+        </div>
+        <span class="enter">Open SoulScene Studio →</span>
+      </div>
+    </div>
+
+    <div class="section-h">Three fast ways to create <span class="lite">· pick your setup &amp; moods — we make the movie</span></div>
+    <div class="chooser" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card persona mini" onclick="enterQuick('mixer')">
+        <div><div class="pico">🎚️</div><h3 style="font-size:22px">Mood Mixer</h3>
+          <p>Blend six emotions on live sliders — matches re-rank as you drag, then we compose an original short from your exact mix.</p></div>
+        <span class="enter">Open Mood Mixer →</span>
+      </div>
+      <div class="card persona mini creator" onclick="enterQuick('timeofday')">
+        <div><div class="pico">🕰️</div><h3 style="font-size:22px">Right Now</h3>
+          <p>SoulScene reads the <b>time of day</b> and creates something made for this exact moment — dawn, golden hour or late night.</p></div>
+        <span class="enter">Make one for now →</span>
+      </div>
+      <div class="card persona mini" onclick="enterQuick('twoppl')">
+        <div><div class="pico">👥</div><h3 style="font-size:22px">Two of You</h3>
+          <p>Two moods in, one movie out — a blend you'll both love, not a compromise. Perfect for co-watching.</p></div>
+        <span class="enter">Create together →</span>
+      </div>
+    </div>
+
+    <div class="section-h">Made on SoulScene <span class="lite">· originals created for a mood, not pulled from a catalog</span></div>
+    <div class="madestrip" id="madeStrip"></div>
+
+    <div class="section-h">Browse by mood</div>
+    <div class="browsetiles" id="browseTiles"></div>
+
+    <div class="section-h">How SoulScene creates <span class="lite">· vs. how a recommender picks</span></div>
+    <div class="feats" style="grid-template-columns:repeat(4,1fr)">
+      <div class="feat"><div class="fi">◐</div><h4>Your mood &amp; arc</h4><p>Start from how you want to feel — the story is built toward it.</p></div>
+      <div class="feat"><div class="fi">✎</div><h4>Your storyline</h4><p>Seed a plot, or let the engine invent one that fits.</p></div>
+      <div class="feat"><div class="fi">☺</div><h4>Your actors</h4><p>Cast personalized avatars &amp; characters from your Memories.</p></div>
+      <div class="feat"><div class="fi">◈</div><h4>Your setup</h4><p>Pick style, length, score &amp; voice — then it's generated.</p></div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><b>24%</b><span>Beachhead segment share</span></div>
+      <div class="stat"><b>5.83/7</b><span>Avg. subscription likelihood</span></div>
+      <div class="stat"><b>65%</b><span>Requested avatars in top 3</span></div>
+    </div>
+
+    <div class="pricingband">
+      <div><div class="pbname">Simple, kind pricing</div><div class="pbsub">Start free with 3 movies a month. Upgrade when SoulScene becomes part of your ritual.</div></div>
+      <button class="cta" onclick="go('pricing')">View plans &amp; pricing →</button>
+    </div>
+  </section>
+
+  <!-- ============ VIEWER · MOOD ============ -->
+  <section class="screen" id="c_mood">
+    <div class="eyebrow">Quick create ·Step 01 · How do you want to feel</div>
+    <h1 class="big">Set your emotional arc</h1>
+    <p class="sub">Tell us where you are and where you want to land. SoulScene builds the scene to carry you there.</p>
+    <div class="arc">
+      <div class="col"><h3>Right now I feel…</h3><div class="chips" id="moodFrom"></div></div>
+      <div class="arcarrow">➜</div>
+      <div class="col"><h3>Tonight I want to feel…</h3><div class="moodgrid" id="moodTo"></div></div>
+    </div>
+    <div class="navrow"><button class="cta" id="moodNext" disabled onclick="go('c_genre')">Choose your world →</button><button class="backlink" onclick="goHome()">← Back</button></div>
+  </section>
+
+  <!-- ============ VIEWER · GENRE ============ -->
+  <section class="screen" id="c_genre">
+    <div class="eyebrow">Quick create ·Step 02 · Choose your world</div>
+    <h1 class="big">What world should it live in?</h1>
+    <p class="sub">The genre shapes the look, pace, and language of your scene — the emotional target stays the same.</p>
+    <div class="grid" id="genreGrid" style="grid-template-columns:repeat(4,1fr)"></div>
+    <div class="navrow"><button class="cta" id="genreNext" disabled onclick="go('c_cast')">Cast your story →</button><button class="backlink" onclick="go('c_mood')">← Back</button></div>
+  </section>
+
+  <!-- ============ VIEWER · CAST ============ -->
+  <section class="screen" id="c_cast">
+    <div class="eyebrow">Quick create ·Step 03 · Who's in your story</div>
+    <h1 class="big">Cast your scene</h1>
+    <p class="sub">Pick up to three, pulled from your <b>SoulScene Memories</b> — the consented avatars you've built before, so returning stories feel continuous.</p>
+    <div class="grid" id="castGrid" style="grid-template-columns:repeat(3,1fr)"></div>
+    <div class="navrow"><button class="cta" id="castNext" onclick="startConsumerGen()">Generate &amp; deliver my scene ✦</button><button class="backlink" onclick="go('c_genre')">← Back</button><span class="hint" id="castHint"></span></div>
+  </section>
+
+  <!-- ============ VIEWER · GENERATING ============ -->
+  <section class="screen" id="c_gen">
+    <div class="eyebrow">Quick create ·The Emotion Engine</div>
+    <h1 class="big">Creating your scene…</h1>
+    <p class="sub">A multimodal pipeline turns your intent into an original cinematic moment, then delivers it to you.</p>
+    <div class="pipe p4">
+      <div class="node" id="cn0"><div class="spin"></div><div class="ic">◱</div><div class="nlab">Input</div><div class="ntt">Mood, genre &amp; cast</div></div>
+      <div class="node" id="cn1"><div class="spin"></div><div class="ic">✎</div><div class="nlab">LLM</div><div class="ntt">Screenplay &amp; dialogue</div></div>
+      <div class="node" id="cn2"><div class="spin"></div><div class="ic">◈</div><div class="nlab">Render</div><div class="ntt">Visuals · voice · score</div></div>
+      <div class="node" id="cn3"><div class="spin"></div><div class="ic">▷</div><div class="nlab">Deliver</div><div class="ntt">Your cinematic scene</div></div>
+    </div>
+    <div class="genbar"><i id="cGenFill"></i></div>
+    <div class="genstat" id="cGenStat"></div>
+    <div class="ragnote" id="cRag"><div style="color:var(--gold-2);font-size:20px">☾</div><div><span class="rtag">RAG · SoulScene Memories</span><br><span style="color:var(--lav);font-size:14px">Grounding the prompt in your saved characters, worlds &amp; emotional preferences for continuity.</span></div></div>
+  </section>
+
+  <!-- ============ VIEWER · SCENE (delivered) ============ -->
+  <section class="screen" id="c_scene">
+    <div class="eyebrow">Delivered to you · created on demand</div>
+    <div class="badgeArc" id="arcBadge"></div>
+    <div class="scenehero">
+      <div class="player" id="cPlayer" onclick="togglePlay('cPlayer','cScrub')">
+        <div id="cPoster"></div>
+        <div class="soulbadge">◆ Soulful · full film</div>
+        <div class="playbtn"><div class="circ"><svg viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div></div>
+        <div class="cap"><span id="cCapTitle"></span><span id="cCapDur"></span></div>
+        <div class="scrub"><i id="cScrub"></i></div>
+      </div>
+      <div>
+        <h1 class="big" id="cTitle" style="margin-bottom:6px"></h1>
+        <p class="logline" id="cLogline"></p>
+        <div class="metaRow" id="cMeta"></div>
+      </div>
+    </div>
+    <div class="section-h">Screenplay outline</div>
+    <div class="beats" id="cBeats"></div>
+    <div class="section-h">Under the hood</div>
+    <div class="twoup">
+      <div class="info"><h4><span style="color:var(--gold-2)">♪</span> Your personalized score</h4><p id="cScore"></p></div>
+      <div class="info"><h4><span style="color:var(--gold-2)">☺</span> Cast &amp; continuity</h4><p id="cCastNote"></p><div class="castline" id="cCastLine"></div></div>
+    </div>
+    <div class="actions">
+      <button class="btn2" onclick="saveScene()">♡ Save to Memories</button>
+      <button class="btn2" onclick="toggleBranch()">⑂ Continue the story</button>
+      <button class="btn2" onclick="startConsumerGen()">↻ Create another</button>
+    </div>
+    <div class="deliver" id="cBranch"><span class="rtag">V1.0 · Branching narratives</span><p style="margin:12px 0 0;color:var(--lav)">Where should the story go next? Each choice re-runs the Emotion Engine from this moment, keeping your arc intact.</p><div class="chipgroup" id="branchOpts" style="margin-top:14px"></div></div>
+  </section>
+
+  <!-- ============ CREATOR · STUDIO SETUP ============ -->
+  <section class="screen" id="s_setup">
+    <div class="eyebrow">Studio · Step 01 · Production setup</div>
+    <h1 class="big">New production</h1>
+    <p class="sub">Define the brief. The engine writes the screenplay, generates the visuals, voice &amp; score, and assembles a short film — up to 5 minutes — tagged for the moods it serves.</p>
+    <div class="studio">
+      <div class="field full">
+        <label>Target moods · what should viewers feel? <span style="color:var(--muted)">(pick 1–3)</span></label>
+        <div class="moodgrid" id="sMoods" style="grid-template-columns:repeat(4,1fr)"></div>
+      </div>
+      <div class="field">
+        <label>Genre / world</label>
+        <div class="chipgroup" id="sGenre"></div>
+      </div>
+      <div class="field">
+        <label>Runtime</label>
+        <div class="rangewrap"><input type="range" id="sLen" min="1" max="5" step="0.5" value="3" oninput="onLen()"><div><div class="lenval" id="sLenVal">3:00</div><div class="lenlab">up to 5:00</div></div></div>
+      </div>
+      <div class="field full">
+        <label>Cast &amp; characters <span style="color:var(--muted)">(from your Memories, or add)</span></label>
+        <div class="castmini" id="sCast"></div>
+      </div>
+      <div class="field"><label>Visual style</label><div class="chipgroup" id="sStyle"></div></div>
+      <div class="field"><label>Score / music</label><div class="chipgroup" id="sMusic"></div></div>
+      <div class="field"><label>Narration voice</label><div class="chipgroup" id="sVoice"></div></div>
+      <div class="field"><label>Aspect ratio</label><div class="chipgroup" id="sAspect"></div></div>
+      <div class="field full">
+        <label>Story seed <span style="color:var(--muted)">(optional)</span></label>
+        <p class="fdesc">Describe the story, or leave blank and the engine will invent one that fits the brief.</p>
+        <textarea id="sSeed" rows="2" placeholder="e.g. A lighthouse keeper receives a letter meant for someone who died years ago…"></textarea>
+        <div class="toggle" id="sSafe" onclick="toggleSafe()" style="margin-top:14px"><span class="tsw"></span><span style="font-size:14px">Child-safe content &amp; filters</span></div>
+      </div>
+    </div>
+    <div class="navrow"><button class="cta" id="sNext" disabled onclick="startFilmGen()">Generate short film ✦</button><button class="backlink" onclick="goHome()">← Back</button><span class="hint" id="sHint">Pick at least one target mood and a genre.</span></div>
+  </section>
+
+  <!-- ============ CREATOR · PRODUCING ============ -->
+  <section class="screen" id="s_gen">
+    <div class="eyebrow">Studio · The Emotion Engine</div>
+    <h1 class="big" id="sGenTitle">Producing your film…</h1>
+    <p class="sub">A multimodal production pipeline turns your brief into a finished short.</p>
+    <div class="pipe p5">
+      <div class="node" id="sn0"><div class="spin"></div><div class="ic">◱</div><div class="nlab">Brief</div><div class="ntt">Moods · style · length</div></div>
+      <div class="node" id="sn1"><div class="spin"></div><div class="ic">✎</div><div class="nlab">Screenplay</div><div class="ntt">Script &amp; shot list</div></div>
+      <div class="node" id="sn2"><div class="spin"></div><div class="ic">▤</div><div class="nlab">Storyboard</div><div class="ntt">Concept art</div></div>
+      <div class="node" id="sn3"><div class="spin"></div><div class="ic">◈</div><div class="nlab">Render</div><div class="ntt">Scenes · voice · score</div></div>
+      <div class="node" id="sn4"><div class="spin"></div><div class="ic">▷</div><div class="nlab">Assemble</div><div class="ntt">Final cut</div></div>
+    </div>
+    <div class="genbar"><i id="sGenFill"></i></div>
+    <div class="genstat" id="sGenStat"></div>
+    <div class="ragnote" id="sRag"><div style="color:var(--gold-2);font-size:20px">☾</div><div><span class="rtag">RAG · Character &amp; world memory</span><br><span style="color:var(--lav);font-size:14px">Keeping cast likeness, voice &amp; world continuity consistent across every shot of the film.</span></div></div>
+  </section>
+
+  <!-- ============ CREATOR · FILM OUTPUT ============ -->
+  <section class="screen" id="s_film">
+    <div class="eyebrow">Studio · Your short film</div>
+    <div class="scenehero">
+      <div class="player" id="sPlayer" onclick="togglePlay('sPlayer','sScrub')">
+        <div id="sPoster"></div>
+        <div class="soulbadge">◆ Soulful · full film</div>
+        <div class="playbtn"><div class="circ"><svg viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div></div>
+        <div class="cap"><span id="sCapTitle"></span><span id="sCapDur"></span></div>
+        <div class="scrub"><i id="sScrub"></i></div>
+      </div>
+      <div>
+        <h1 class="big" id="sTitle" style="margin-bottom:6px"></h1>
+        <p class="logline" id="sSynopsis"></p>
+        <div class="metaRow" id="sFilmMeta"></div>
+      </div>
+    </div>
+    <div class="section-h" id="shotHead">Shot breakdown</div>
+    <div class="beats" id="sShots"></div>
+    <div class="section-h">Production settings used</div>
+    <div class="setgrid" id="sSettings"></div>
+    <div class="actions">
+      <button class="btn2 primary" onclick="publishFilm()">▲ Publish to mood library</button>
+      <button class="btn2" onclick="startFilmGen()">↻ Regenerate</button>
+      <button class="btn2" onclick="go('s_setup')">✎ Edit setup</button>
+      <button class="btn2" onclick="newProduction()">＋ New production</button>
+    </div>
+    <div class="deliver" id="sDeliver">
+      <h4>✓ Published — now delivered on demand</h4>
+      <p style="color:var(--lav);margin:0" id="deliverMsg"></p>
+      <div class="previewcard"><div class="th" id="previewTh"></div><div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">How a viewer receives it</div><div style="font-weight:600;margin:3px 0" id="previewTitle"></div><div style="font-size:12px;color:var(--lav)" id="previewMood"></div></div></div>
+      <div style="margin-top:16px"><button class="btn2" onclick="previewAsViewer()">▷ Preview as a viewer</button></div>
+    </div>
+  </section>
+
+  <!-- ============ FAST · MOOD MIXER ============ -->
+  <section class="screen" id="mixer">
+    <div class="eyebrow">Fast create · Mood Mixer</div>
+    <h1 class="big">Mix the feeling</h1>
+    <p class="sub">Drag the sliders to blend the emotions you want your movie to leave you with. Matches re-rank live — then we compose an original short from your mix.</p>
+    <div class="mixwrap">
+      <div class="field">
+        <label>Emotional blend</label>
+        <div id="mixSliders"></div>
+        <div style="margin-top:18px"><label>Runtime</label><div class="rangewrap"><input type="range" id="mixLen" min="1" max="5" step="0.5" value="3" oninput="mixMin=+this.value;document.getElementById('mixLenVal').textContent=fmtMin(mixMin)"><div class="lenval" id="mixLenVal">3:00</div></div></div>
+        <div class="mixreadout" id="mixReadout"></div>
+      </div>
+      <div class="field"><label>Best matches · re-ranking live</label><div class="rerank" id="mixRerank"></div></div>
+    </div>
+    <div class="navrow"><button class="cta" onclick="composeMixer()">Compose my movie ✦</button><button class="backlink" onclick="goHome()">← Back</button></div>
+  </section>
+
+  <!-- ============ FAST · TIME OF DAY ============ -->
+  <section class="screen" id="timeofday">
+    <div class="eyebrow">Fast create · Right now</div>
+    <h1 class="big">Made for this moment</h1>
+    <p class="sub">SoulScene reads the time of day and shapes a movie to fit it. It's <b id="nowClock">—</b> where you are — <span id="nowSlotLine"></span></p>
+    <div class="slots" id="slotGrid"></div>
+    <div class="mixreadout" id="timeReadout" style="margin-top:20px"></div>
+    <div class="navrow"><button class="cta" onclick="composeTime()">Create for right now ✦</button><button class="backlink" onclick="goHome()">← Back</button></div>
+  </section>
+
+  <!-- ============ FAST · TWO OF YOU ============ -->
+  <section class="screen" id="twoppl">
+    <div class="eyebrow">Fast create · Two of you</div>
+    <h1 class="big">One movie, for both of you</h1>
+    <p class="sub">Everyone's in a different mood. Pick one for each of you and we'll create a single short that blends them — a real blend, not a compromise.</p>
+    <div class="twocol">
+      <div class="field"><label>You want to feel…</label><div class="chipgroup" id="twoA"></div></div>
+      <div class="field"><label>They want to feel…</label><div class="chipgroup" id="twoB"></div></div>
+    </div>
+    <div class="mixreadout" id="twoReadout" style="margin-top:20px"></div>
+    <div class="navrow"><button class="cta" id="twoBtn" disabled onclick="composeTwo()">Create our movie ✦</button><button class="backlink" onclick="goHome()">← Back</button></div>
+  </section>
+
+  <!-- ============ PRICING ============ -->
+  <section class="screen" id="pricing">
+    <div class="pricehero">
+      <div class="eyebrow">Plans &amp; pricing</div>
+      <h1 class="big">Choose your ritual</h1>
+      <p class="sub">Start free. Upgrade when creating your own scenes becomes part of how you unwind. Cancel anytime.</p>
+    </div>
+    <div class="billtoggle" id="billToggle">
+      <button class="bt on" data-b="monthly" onclick="setBilling('monthly')">Monthly</button>
+      <button class="bt" data-b="annual" onclick="setBilling('annual')">Annual&nbsp;<span class="save">· 2 months free</span></button>
+    </div>
+    <div class="pricegrid" id="priceGrid"></div>
+    <div class="pricefoot">Concept prototype — plans are illustrative and no real payment is taken. Prices in USD.</div>
+    <div class="navrow" style="justify-content:center"><button class="backlink" onclick="goHome()">← Back to home</button></div>
+  </section>
+
+  <!-- ============ MEMORIES (viewer library) ============ -->
+  <section class="screen" id="memories">
+    <div class="eyebrow">☾ SoulScene Memories</div>
+    <h1 class="big">Your worlds, remembered</h1>
+    <p class="sub">Every scene you save and every character you build is retrieved to ground future stories — the RAG layer that powers continuity.</p>
+    <div class="section-h">Saved scenes</div>
+    <div class="memgrid" id="memGrid"></div>
+    <div class="section-h">Your characters</div>
+    <div class="grid" id="memCast" style="grid-template-columns:repeat(4,1fr)"></div>
+    <div class="navrow"><button class="cta" onclick="choose('consumer')">Create a new scene ✦</button></div>
+  </section>
+</main>
+
+<div class="footline">SoulScene — concept prototype · all “generation” is pre-baked to demonstrate the vision · no real AI calls or personal data</div>
+<div class="toast" id="toast"><span class="tk">✓</span><span id="toastMsg"></span></div>
+
+<script>
+/* ======================= DATA ======================= */
+const MOODS_FROM=["Stressed","Restless","Lonely","Numb","Anxious","Drained","Bored","Overwhelmed"];
+const MOODS_TO=[
+  {k:"calm",l:"Calm",v:"quiet · unhurried",a:"#2B6E7F",b:"#12313C",glow:"#4FD1C5",accent:"#8CE7DA"},
+  {k:"inspired",l:"Inspired",v:"lifted · awake",a:"#8A6D1F",b:"#3A2E12",glow:"#E7C662",accent:"#F2D98A"},
+  {k:"nostalgic",l:"Nostalgic",v:"tender · golden",a:"#6D2E46",b:"#331526",glow:"#C97FA0",accent:"#E7AFC7"},
+  {k:"hopeful",l:"Hopeful",v:"open · forward",a:"#2C6E49",b:"#123322",glow:"#5FCB8B",accent:"#9CE7BC"},
+  {k:"thrilled",l:"Thrilled",v:"electric · alive",a:"#7A1F4B",b:"#331227",glow:"#FF5C8A",accent:"#FF9DBC"},
+  {k:"comforted",l:"Comforted",v:"warm · held",a:"#8A4A1F",b:"#3A2012",glow:"#E79B4B",accent:"#F2C79A"},
+  {k:"empowered",l:"Empowered",v:"steady · sure",a:"#4B2E8A",b:"#20123A",glow:"#9A7BFF",accent:"#C6B6FF"},
+  {k:"wonder",l:"Wonder",v:"vast · dreaming",a:"#2E3A8A",b:"#12173A",glow:"#7B8FFF",accent:"#AEB9FF"}
+];
+const GENRES=[
+  {k:"slice",l:"Slice of Life",d:"Small, human, real",motif:"room",pal:["#3A2A4A","#7A4A3A","#1B1220"]},
+  {k:"scifi",l:"Sci-Fi",d:"Wonder at the edge",motif:"cosmos",pal:["#0E1230","#25357A","#080814"]},
+  {k:"fantasy",l:"Fantasy",d:"Myth & elsewhere",motif:"mountains",pal:["#241640","#6A4AA0","#120C24"]},
+  {k:"romance",l:"Romance",d:"Closeness & longing",motif:"shore",pal:["#3A1A2A","#C0607A","#1C0F18"]},
+  {k:"adventure",l:"Adventure",d:"Motion & horizon",motif:"mountains",pal:["#123038","#C97A3A","#0A1A1E"]},
+  {k:"noir",l:"Noir Mystery",d:"Shadow & question",motif:"city",pal:["#0E1428","#2A4670","#060A14"]},
+  {k:"magic",l:"Magical Realism",d:"The ordinary, glowing",motif:"forest",pal:["#12301E","#4E8A54","#081810"]},
+  {k:"nature",l:"Nature Doc",d:"Awe of the living world",motif:"shore",pal:["#0F2C3C","#2F94C0","#081820"]}
+];
+let CAST=[
+  {id:"you",name:"You",tag:"Your avatar",mem:true,pal:["#E7C662","#8A6D1F"],ini:"You"},
+  {id:"maya",name:"Maya",tag:"Your daughter",mem:true,pal:["#E7AFC7","#6D2E46"],ini:"M"},
+  {id:"mentor",name:"The Mentor",tag:"Recurring character",mem:true,pal:["#AEB9FF","#2E3A8A"],ini:"TM"},
+  {id:"nova",name:"Nova",tag:"AI companion",mem:true,pal:["#8CE7DA","#2B6E7F"],ini:"N"},
+  {id:"srk",name:"Shah Rukh Khan",tag:"Romance icon",star:true,pal:["#F2A6A6","#8A2F2F"],ini:"SRK"},
+  {id:"deepika",name:"Deepika Padukone",tag:"Leading lady",star:true,pal:["#F2C79A","#8A5A1F"],ini:"DP"},
+  {id:"ranbir",name:"Ranbir Kapoor",tag:"Leading man",star:true,pal:["#9AD6F2","#1F5A8A"],ini:"RK"},
+  {id:"alia",name:"Alia Bhatt",tag:"Leading lady",star:true,pal:["#F3B2D6","#8A2F5A"],ini:"AB"},
+  {id:"ranveer",name:"Ranveer Singh",tag:"Leading man",star:true,pal:["#C6B6FF","#4B2E8A"],ini:"RS"},
+  {id:"priyanka",name:"Priyanka Chopra",tag:"Global star",star:true,pal:["#8CE7C0","#1F7A5A"],ini:"PC"}
+];
+const STYLES=[{k:"cinematic",l:"Cinematic live-action"},{k:"animated",l:"Animated"},{k:"anime",l:"Anime"},{k:"water",l:"Watercolor"},{k:"noir",l:"Noir B&W"},{k:"3d",l:"Photoreal 3D"}];
+const MUSICS=[{k:"orchestral",l:"Orchestral"},{k:"ambient",l:"Ambient"},{k:"lofi",l:"Lo-fi"},{k:"piano",l:"Solo piano"},{k:"electronic",l:"Electronic"},{k:"none",l:"No score"}];
+const VOICES=[{k:"warm",l:"Warm narrator"},{k:"deep",l:"Deep & cinematic"},{k:"neutral",l:"Neutral"},{k:"child",l:"Child-friendly"},{k:"none",l:"No narration"}];
+const ASPECTS=[{k:"16:9",l:"16:9 Widescreen"},{k:"9:16",l:"9:16 Vertical"},{k:"1:1",l:"1:1 Square"}];
+
+const TITLES={
+  calm:["The Quiet Between Stars","Still Water, Slow Light","A Softer Hour","Where the Noise Ends"],
+  inspired:["The Morning You Begin Again","Ignition","Everything Not Yet Built","First Draft of Tomorrow"],
+  nostalgic:["The House That Remembers","The Long Way Home","Postcards From Before","Amber Light"],
+  hopeful:["First Light on the Ridge","The Door Left Open","Small Green Things","North of Here"],
+  thrilled:["Velocity","The Last Good Heist","Edge of the Map","Redline"],
+  comforted:["Blanket Weather","The Kitchen Light","Someone Waited Up","The Long Exhale"],
+  empowered:["Stand","The Rise of Quiet Things","Nobody's Permission","Unbent"],
+  wonder:["The Cartographer of Dreams","A Country Made of Sky","When the Whales Sang Back","The Hour of Blue"]
+};
+const SCORE={calm:"A slow piano motif over low strings, mixed soft — from your saved “late-night” palette.",inspired:"Rising synth arpeggios and a bright brass swell, tempo climbing to the final frame.",nostalgic:"Warm tape-worn guitar and a distant music box, EQ'd to feel like memory.",hopeful:"Gentle acoustic build with a choir that opens as the light does.",thrilled:"Driving percussion and a pulsing bassline, cut tight to the edit.",comforted:"Fireside upright piano and vinyl crackle, deliberately unhurried.",empowered:"A single cello growing into full strings and a steady, grounded drum.",wonder:"Ambient pads, glass harmonics and a wordless vocal drifting overhead."};
+const TURN={slice:"a phone call from an old friend",scifi:"a signal from a derelict station",fantasy:"a stranger who knows your name",romance:"a letter that was never sent",adventure:"a map with one island missing",noir:"a door left unlocked",magic:"a garden that starts to glow",nature:"a tide that pulls back too far"};
+const SHOT_LABELS=["Cold open","Establishing","Inciting moment","Rising action","The turn","Resolution"];
+const DURS=["3:42","4:08","4:36","5:12","3:58","4:24"];
+const EMOJI={calm:"🌙",inspired:"✨",nostalgic:"🍂",hopeful:"🌅",thrilled:"⚡",comforted:"☕",empowered:"🦁",wonder:"🌌"};
+
+/* ======================= STATE ======================= */
+const state={mode:null,from:null,to:null,genre:null,cast:["you"],generated:null,memories:[],
+  creator:{moods:new Set(),genre:null,cast:["you"],minutes:3,style:"cinematic",music:"orchestral",voice:"warm",aspect:"16:9",seed:"",safe:false,film:null,published:false}};
+
+const CONSUMER_STEPS=[{id:"c_mood",l:"Feel"},{id:"c_genre",l:"World"},{id:"c_cast",l:"Cast"},{id:"c_gen",l:"Create"},{id:"c_scene",l:"Deliver"}];
+const CREATOR_STEPS=[{id:"s_setup",l:"Setup"},{id:"s_gen",l:"Produce"},{id:"s_film",l:"Film"}];
+
+/* ======================= NAV / STEPS ======================= */
+function stepsFor(id){if(CONSUMER_STEPS.find(s=>s.id===id))return CONSUMER_STEPS;if(CREATOR_STEPS.find(s=>s.id===id))return CREATOR_STEPS;return null;}
+function buildSteps(id){
+  const list=stepsFor(id),el=document.getElementById("steps");el.innerHTML="";
+  if(!list)return;const idx=list.findIndex(s=>s.id===id);
+  list.forEach((s,i)=>{if(i)el.insertAdjacentHTML("beforeend",'<span class="sep"></span>');
+    el.insertAdjacentHTML("beforeend",`<span class="s ${i===idx?'active':''} ${i<idx?'done':''}"><span class="dot"></span>${s.l}</span>`);});
+}
+function go(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  buildSteps(id);window.scrollTo({top:0,behavior:"smooth"});
+}
+function choose(mode){
+  state.mode=mode;
+  const pill=document.getElementById("modePill");pill.style.display="flex";
+  document.getElementById("modeLabel").textContent=mode==="consumer"?"Quick create":"Studio";
+  document.getElementById("switchBtn").style.display="inline-block";
+  document.getElementById("memNav").style.display=(mode==="consumer"&&state.memories.length)?"inline-block":"none";
+  if(mode==="consumer")go("c_mood");else go("s_setup");
+}
+function goHome(){
+  document.getElementById("modePill").style.display="none";
+  document.getElementById("switchBtn").style.display="none";
+  document.getElementById("memNav").style.display="none";
+  applyMood(MOODS_TO[7]);go("chooser");
+}
+function newProduction(){state.creator.published=false;document.getElementById("sDeliver").classList.remove("show");go("s_setup");}
+
+/* ======================= HOME (concierge) ======================= */
+let MADE=[];
+function renderHome(){
+  const q=document.getElementById("qmoods");q.innerHTML="";
+  MOODS_TO.forEach(m=>{const c=document.createElement("button");c.className="qchip";c.innerHTML=`<span>${EMOJI[m.k]}</span> ${m.l}`;c.onclick=()=>quickMood(m.k);q.appendChild(c);});
+  const sc=document.createElement("button");sc.className="qchip";sc.innerHTML="🎲 Surprise me";sc.onclick=surpriseMe;q.appendChild(sc);
+  const b=document.getElementById("browseTiles");b.innerHTML="";
+  MOODS_TO.forEach(m=>{const t=document.createElement("div");t.className="btile";t.innerHTML=`<span class="be">${EMOJI[m.k]}</span><span><span class="bl">${m.l}</span><br><span class="bv">${m.v}</span></span>`;t.onclick=()=>quickMood(m.k);b.appendChild(t);});
+  if(!MADE.length){const combos=[["calm","nature"],["thrilled","noir"],["nostalgic","slice"],["wonder","scifi"]];
+    MADE=combos.map(([mk,gk])=>{const m=MOODS_TO.find(x=>x.k===mk),g=GENRES.find(x=>x.k===gk),h=hashSel(mk+gk);return {m,g,title:pick(TITLES[mk],h),dur:pick(DURS,h>>2)};});}
+  const ms=document.getElementById("madeStrip");ms.innerHTML="";
+  MADE.forEach((x,i)=>{const c=document.createElement("div");c.className="madecard";c.innerHTML=`<div class="th">${poster(x.g,x.m,i+1)}</div><div class="mc"><p class="mt">${x.title}</p><div class="tags"><span class="tag mood">${x.m.l}</span><span class="tag">${x.g.l}</span><span class="tag">${x.dur}</span></div></div>`;c.onclick=()=>openMade(i);ms.appendChild(c);});
+}
+function quickMood(k){const m=MOODS_TO.find(x=>x.k===k);choose('consumer');state.to=m;applyMood(m);renderMoodTo();checkMood();toast('Now pick where you are right now — then we create your movie.');}
+function surpriseMe(){quickMood(MOODS_TO[Math.floor(Math.random()*MOODS_TO.length)].k);}
+function createFromBar(){const t=document.getElementById("homePrompt").value.trim();
+  if(t.length>=12){choose('creator');const s=document.getElementById("sSeed");if(s)s.value=t;toast('Storyline added — now pick your target moods & cast.');}
+  else choose('consumer');
+}
+function openMade(i){const x=MADE[i];state.mode="consumer";
+  document.getElementById("modePill").style.display="flex";document.getElementById("modeLabel").textContent="Quick create";document.getElementById("switchBtn").style.display="inline-block";
+  state.from="Curious";state.to=x.m;state.genre=x.g;state.cast=["you"];applyMood(x.m);
+  state.generated=generateScene();renderScene(state.generated);
+  document.getElementById("arcBadge").innerHTML=`<span>Made on SoulScene · an original for feeling <b>${x.m.l}</b></span>`;
+  go("c_scene");
+}
+
+/* ======================= THEME ======================= */
+function applyMood(m){const r=document.documentElement.style;r.setProperty("--mood-a",m.a);r.setProperty("--mood-b",m.b);r.setProperty("--glow",m.glow);r.setProperty("--accent",m.accent);}
+
+/* ======================= VIEWER RENDER ======================= */
+function renderMoodFrom(){const el=document.getElementById("moodFrom");el.innerHTML="";MOODS_FROM.forEach(m=>{const c=document.createElement("button");c.className="chip"+(state.from===m?" sel":"");c.textContent=m;c.onclick=()=>{state.from=m;renderMoodFrom();checkMood();};el.appendChild(c);});}
+function renderMoodTo(){const el=document.getElementById("moodTo");el.innerHTML="";MOODS_TO.forEach(m=>{const c=document.createElement("div");c.className="moodmini"+(state.to&&state.to.k===m.k?" sel":"");c.innerHTML=`<span class="o" style="background:radial-gradient(circle at 35% 30%,${m.accent},${m.a} 70%,${m.b})"></span><span><span class="l">${m.l}</span><br><span class="v">${m.v}</span></span>`;c.onclick=()=>{state.to=m;applyMood(m);renderMoodTo();checkMood();};el.appendChild(c);});}
+function checkMood(){document.getElementById("moodNext").disabled=!(state.from&&state.to);}
+function renderGenre(){const el=document.getElementById("genreGrid");el.innerHTML="";GENRES.forEach(g=>{const c=document.createElement("div");c.className="card"+(state.genre&&state.genre.k===g.k?" sel":"");c.innerHTML=`<div class="orb" style="background:linear-gradient(135deg,${g.pal[1]},${g.pal[0]})"></div><p class="ttl">${g.l}</p><p class="desc">${g.d}</p>`;c.onclick=()=>{state.genre=g;renderGenre();document.getElementById("genreNext").disabled=false;};el.appendChild(c);});}
+function avatarHTML(p,cls=""){return `<span class="avatar ${cls}" style="background:linear-gradient(135deg,${p.pal[0]},${p.pal[1]})">${p.ini}</span>`;}
+function renderCast(){
+  const el=document.getElementById("castGrid");el.innerHTML="";
+  CAST.forEach(p=>{const on=state.cast.includes(p.id);const c=document.createElement("div");c.className="card castcard"+(on?" sel":"")+(p.id==="you"?" locked":"");c.innerHTML=`${avatarHTML(p)}<div class="meta"><p class="ttl">${p.name}</p><p class="desc">${p.tag}</p>${p.star?'<span class="memtag star">★ Bollywood</span>':(p.mem?'<span class="memtag">☾ from Memories</span>':'')}</div>`;c.onclick=()=>toggleCast(p.id);el.appendChild(c);});
+  const add=document.createElement("div");add.className="card addcard";add.innerHTML=`<span class="plus">+</span><div class="meta"><p class="ttl">Add a character</p><p class="desc">Upload a photo or voice — consented</p></div>`;add.onclick=addCharacter;el.appendChild(add);
+  document.getElementById("castHint").textContent=state.cast.length+" selected · up to 3";
+}
+function toggleCast(id){if(id==="you")return;const i=state.cast.indexOf(id);if(i>=0)state.cast.splice(i,1);else{if(state.cast.length>=3){toast("You can cast up to three characters.");return;}state.cast.push(id);}renderCast();}
+let added=0;
+function addCharacter(){if(added>=1){toast("This is a prototype — one demo add is enough ✨");return;}CAST.push({id:"kai",name:"Kai",tag:"New avatar · you added",mem:false,pal:["#F2C79A","#8A4A1F"],ini:"K"});added++;if(state.cast.length<3)state.cast.push("kai");renderCast();renderSCast();toast("Consent recorded — you can delete this avatar & its data anytime.");}
+
+/* ======================= VIEWER GENERATION ======================= */
+function startConsumerGen(){
+  if(!state.cast.length)state.cast=["you"];
+  go("c_gen");["cn0","cn1","cn2","cn3"].forEach(id=>document.getElementById(id).classList.remove("on","done"));
+  document.getElementById("cGenFill").style.width="0%";document.getElementById("cRag").classList.remove("show");
+  const stages=[{n:"cn0",p:12,t:`Locking in your intent — ${state.from} → ${state.to.l}, ${state.genre.l}…`},{n:"cn1",p:46,t:"Writing an original screenplay & dialogue around your arc…",rag:true},{n:"cn2",p:82,t:"Rendering visuals, casting avatars, synthesizing voice & scoring music…"},{n:"cn3",p:100,t:"Delivering your cinematic scene…"}];
+  runPipe(stages,"cGenStat","cGenFill","cRag",()=>{state.generated=generateScene();setTimeout(()=>{renderScene(state.generated);go("c_scene");},500);});
+}
+function runPipe(stages,statId,fillId,ragId,done){
+  let i=0;const stat=document.getElementById(statId),fill=document.getElementById(fillId);
+  (function run(){
+    if(i>0)document.getElementById(stages[i-1].n).classList.replace("on","done");
+    if(i>=stages.length){done();return;}
+    const s=stages[i],node=document.getElementById(s.n);node.classList.add("on");stat.textContent=s.t;fill.style.width=s.p+"%";
+    if(s.rag&&ragId)setTimeout(()=>document.getElementById(ragId).classList.add("show"),300);
+    i++;setTimeout(run,i===1?850:1050);
+  })();
+}
+function hashSel(str){let h=0;for(let i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))>>>0;return h;}
+function pick(a,h){return a[h%a.length];}
+function generateScene(){
+  const h=hashSel(state.from+state.to.k+state.genre.k+state.cast.join(",")),m=state.to,g=state.genre;
+  const lead=CAST.find(c=>c.id===state.cast[0])||CAST[0];
+  const names=state.cast.map(id=>(CAST.find(c=>c.id===id)||{}).name).filter(Boolean);
+  const namesStr=names.length===1?names[0]:names.slice(0,-1).join(", ")+" & "+names.slice(-1);
+  const dur=pick(DURS,h>>3),title=pick(TITLES[m.k],h);
+  return {title,dur,mood:m,genre:g,namesStr,names,
+    logline:`A ${dur} ${g.l.toLowerCase()} short, cast with ${namesStr}, written to carry you from ${state.from.toLowerCase()} to ${m.l.toLowerCase()}.`,
+    score:SCORE[m.k],
+    beats:[
+      {n:"Cold open",t:"Where we start",d:`${lead.name} moves through a ${g.d.toLowerCase()} world, still carrying the weight of feeling ${state.from.toLowerCase()}.`},
+      {n:"The turn",t:"Something shifts",d:`An unexpected moment — ${TURN[g.k]} — cracks the mood open and changes the light.`},
+      {n:"The landing",t:"Where we arrive",d:`By the final frame the tone resolves into ${m.l.toLowerCase()}. ${names.length>1?namesStr+" share the last beat.":lead.name+" carries it home."}`}
+    ]};
+}
+function renderScene(s){
+  document.getElementById("cPoster").innerHTML=poster(s.genre,s.mood,1);
+  document.getElementById("cTitle").textContent=s.title;document.getElementById("cCapTitle").textContent=s.title;
+  document.getElementById("cCapDur").textContent="Narrated preview · "+s.dur;
+  document.getElementById("cLogline").textContent=s.logline;
+  document.getElementById("arcBadge").innerHTML=`<span>${state.from}</span> <b>➜</b> <span>${s.mood.l}</span>`;
+  const cvid=videoFor(s.mood);document.getElementById("cPlayer").dataset.vid=JSON.stringify(cvid);
+  document.getElementById("cMeta").innerHTML=`<span class="tag mood">${s.mood.l}</span><span class="tag">${s.genre.l}</span><span class="tag">${s.dur}</span>`+s.names.map(n=>`<span class="tag">☺ ${n}</span>`).join("")+`<a class="tag ythref" href="https://www.youtube.com/watch?v=${cvid}" target="_blank" rel="noopener">▶ Watch full film ↗</a>`;
+  document.getElementById("cScore").textContent=s.score;
+  document.getElementById("cCastNote").textContent=`Cast with ${s.namesStr}. Saved characters keep their look, voice & backstory across every scene you make.`;
+  document.getElementById("cCastLine").innerHTML=state.cast.map(id=>{const p=CAST.find(c=>c.id===id);return p?avatarHTML(p):"";}).join("");
+  const bs=document.getElementById("cBeats");bs.innerHTML="";
+  s.beats.forEach((b,i)=>{const el=document.createElement("div");el.className="beat";el.innerHTML=`<div class="still">${poster(s.genre,s.mood,i+2)}</div><div class="bd"><div class="bn"><span>${b.n}</span></div><p class="bt">${b.t}</p><p class="bx">${b.d}</p></div>`;bs.appendChild(el);});
+  document.getElementById("cBranch").classList.remove("show");
+  resetPlayer("cPlayer","cScrub");
+}
+
+/* ======================= CREATOR STUDIO ======================= */
+function renderSMoods(){const el=document.getElementById("sMoods");el.innerHTML="";MOODS_TO.forEach(m=>{const on=state.creator.moods.has(m.k);const c=document.createElement("div");c.className="moodmini"+(on?" sel":"");c.innerHTML=`<span class="o" style="background:radial-gradient(circle at 35% 30%,${m.accent},${m.a} 70%,${m.b})"></span><span><span class="l">${m.l}</span></span>`;c.onclick=()=>toggleSMood(m);el.appendChild(c);});}
+function toggleSMood(m){const s=state.creator.moods;if(s.has(m.k))s.delete(m.k);else{if(s.size>=3){toast("Target up to three moods per film.");return;}s.add(m.k);applyMood(m);}renderSMoods();checkSetup();}
+function chipGroup(id,opts,getSel,onPick){const el=document.getElementById(id);el.innerHTML="";opts.forEach(o=>{const c=document.createElement("button");c.className="chip sm"+(getSel(o)?" sel":"");c.textContent=o.l;c.onclick=()=>onPick(o);el.appendChild(c);});}
+function renderStudio(){
+  renderSMoods();
+  chipGroup("sGenre",GENRES,g=>state.creator.genre&&state.creator.genre.k===g.k,g=>{state.creator.genre=g;renderStudio();checkSetup();});
+  chipGroup("sStyle",STYLES,o=>state.creator.style===o.k,o=>{state.creator.style=o.k;renderStudio();});
+  chipGroup("sMusic",MUSICS,o=>state.creator.music===o.k,o=>{state.creator.music=o.k;renderStudio();});
+  chipGroup("sVoice",VOICES,o=>state.creator.voice===o.k,o=>{state.creator.voice=o.k;renderStudio();});
+  chipGroup("sAspect",ASPECTS,o=>state.creator.aspect===o.k,o=>{state.creator.aspect=o.k;renderStudio();});
+  renderSCast();
+}
+function renderSCast(){const el=document.getElementById("sCast");el.innerHTML="";CAST.forEach(p=>{const on=state.creator.cast.includes(p.id);const c=document.createElement("div");c.className="castpick"+(on?" sel":"");c.innerHTML=`${avatarHTML(p)}<span>${p.name}</span>`;c.onclick=()=>{if(p.id==="you")return;const i=state.creator.cast.indexOf(p.id);if(i>=0)state.creator.cast.splice(i,1);else{if(state.creator.cast.length>=4){toast("Up to four characters per film.");return;}state.creator.cast.push(p.id);}renderSCast();};el.appendChild(c);});const add=document.createElement("div");add.className="castpick";add.innerHTML=`<span class="plus" style="width:30px;height:30px;font-size:16px">+</span><span>Add</span>`;add.onclick=addCharacter;el.appendChild(add);}
+function onLen(){const v=parseFloat(document.getElementById("sLen").value);state.creator.minutes=v;document.getElementById("sLenVal").textContent=fmtMin(v);}
+function toggleSafe(){state.creator.safe=!state.creator.safe;document.getElementById("sSafe").classList.toggle("on",state.creator.safe);}
+function checkSetup(){document.getElementById("sNext").disabled=!(state.creator.moods.size&&state.creator.genre);}
+function fmtMin(v){const s=Math.round(v*60);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");}
+function fmtSec(s){return Math.floor(s/60)+":"+String(Math.round(s)%60).toString().padStart(2,"0");}
+
+function startFilmGen(){const sEl=document.getElementById("sSeed");if(sEl)state.creator.seed=sEl.value.trim();produceFilm();}
+function produceFilm(){
+  go("s_gen");["sn0","sn1","sn2","sn3","sn4"].forEach(id=>document.getElementById(id).classList.remove("on","done"));
+  document.getElementById("sGenFill").style.width="0%";document.getElementById("sRag").classList.remove("show");
+  const moodLabels=[...state.creator.moods].map(k=>MOODS_TO.find(m=>m.k===k).l).join(", ");
+  const stages=[{n:"sn0",p:10,t:`Interpreting the brief — ${moodLabels} · ${state.creator.genre.l} · ${fmtMin(state.creator.minutes)}…`},{n:"sn1",p:34,t:"Writing the screenplay, dialogue & shot list…"},{n:"sn2",p:58,t:"Generating the storyboard & concept art…",rag:true},{n:"sn3",p:84,t:`Rendering scenes, ${VOICES.find(v=>v.k===state.creator.voice).l.toLowerCase()} & ${MUSICS.find(m=>m.k===state.creator.music).l.toLowerCase()} score…`},{n:"sn4",p:100,t:`Assembling the final ${fmtMin(state.creator.minutes)} cut…`}];
+  runPipe(stages,"sGenStat","sGenFill","sRag",()=>{state.creator.film=generateFilm();setTimeout(()=>{renderFilm(state.creator.film);go("s_film");},500);});
+}
+function generateFilm(){
+  const c=state.creator,moods=[...c.moods].map(k=>MOODS_TO.find(m=>m.k===k)),primary=moods[0],g=c.genre;
+  const h=hashSel([...c.moods].join("")+g.k+c.style+c.minutes+c.seed);
+  const names=c.cast.map(id=>(CAST.find(x=>x.id===id)||{}).name).filter(Boolean);
+  const namesStr=names.length===1?names[0]:names.slice(0,-1).join(", ")+" & "+names.slice(-1);
+  const title=c.seed?seedTitle(c.seed,h):pick(TITLES[primary.k],h);
+  const nScenes=Math.max(3,Math.min(6,Math.round(c.minutes*1.1)+1));
+  const totalSec=c.minutes*60;let acc=0;const shots=[];
+  for(let i=0;i<nScenes;i++){
+    const last=i===nScenes-1;const dur=last?totalSec-acc:Math.max(28,Math.round(totalSec/nScenes*(0.8+((h>>(i+2))%40)/100)));acc+=dur;
+    shots.push({label:SHOT_LABELS[i]||("Scene "+(i+1)),dur:fmtSec(dur),desc:shotDesc(i,nScenes,g,primary,namesStr,c)});
+  }
+  const moodStr=moods.map(m=>m.l).join(", ");
+  const styleL=styleLabel(c.style).toLowerCase();
+  const synopsis=c.seed
+    ? `${cap(c.seed.replace(/\.$/,""))}. Told as a ${fmtMin(c.minutes)} ${g.l.toLowerCase()} short in a ${styleL} style, tuned to leave viewers feeling ${moodStr.toLowerCase()}.`
+    : `A ${fmtMin(c.minutes)} ${g.l.toLowerCase()} short in a ${styleL} style, cast with ${namesStr}, engineered to move viewers toward ${moodStr.toLowerCase()}.`;
+  return {title,moods,primary,genre:g,shots,synopsis,namesStr,names,dur:fmtMin(c.minutes),moodStr,
+    settings:[["Runtime",fmtMin(c.minutes)],["Style",styleLabel(c.style)],["Score",MUSICS.find(m=>m.k===c.music).l],["Narration",VOICES.find(v=>v.k===c.voice).l],["Aspect",c.aspect],["Safety",c.safe?"Child-safe ✓":"Standard"]]};
+}
+function styleLabel(k){return (STYLES.find(s=>s.k===k)||{l:k}).l;}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+function seedTitle(seed,h){const words=seed.replace(/[^a-zA-Z ]/g,"").split(/\s+/).filter(w=>w.length>3);if(words.length>=2){const a=words[h%words.length],b=words[(h>>3)%words.length];return cap(a)+" & "+cap(b==a?words[(h>>5)%words.length]||"Light":b);}return "Untitled Scene";}
+function shotDesc(i,n,g,mood,names,c){
+  if(i===0)return `Open on ${styleLabel(c.style).toLowerCase()} imagery of a ${g.d.toLowerCase()} world. ${names} enters; the mood is unsettled and searching.`;
+  if(i===1)return `We settle into the world and the rhythm of ${names}'s day — small, specific, human details establish the emotional baseline.`;
+  if(i===n-1)return `The film lands: the tone resolves fully into ${mood.l.toLowerCase()}. A final image holds, scored to linger after the cut.`;
+  if(i===n-2)return `The turn — ${TURN[g.k]} — reframes everything and tips the story toward its emotional target.`;
+  return `Tension and texture build. The visuals and ${MUSICS.find(m=>m.k===c.music).l.toLowerCase()} score push ${names} closer to change.`;
+}
+function renderFilm(f){
+  document.getElementById("sPoster").innerHTML=poster(f.genre,f.primary,1);
+  document.getElementById("sTitle").textContent=f.title;document.getElementById("sCapTitle").textContent=f.title;
+  document.getElementById("sCapDur").textContent="Final cut · "+f.dur;
+  document.getElementById("sSynopsis").textContent=f.synopsis;
+  const svid=videoFor(f.primary);document.getElementById("sPlayer").dataset.vid=JSON.stringify(svid);
+  document.getElementById("sFilmMeta").innerHTML=f.moods.map(m=>`<span class="tag mood">${m.l}</span>`).join("")+`<span class="tag">${f.genre.l}</span><span class="tag">${f.dur}</span>`+f.names.map(n=>`<span class="tag">☺ ${n}</span>`).join("")+`<a class="tag ythref" href="https://www.youtube.com/watch?v=${svid}" target="_blank" rel="noopener">▶ Watch full film ↗</a>`;
+  document.getElementById("shotHead").innerHTML=`Shot breakdown <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">· ${f.shots.length} scenes</span>`;
+  const el=document.getElementById("sShots");el.innerHTML="";
+  f.shots.forEach((s,i)=>{const d=document.createElement("div");d.className="beat";d.innerHTML=`<div class="still">${poster(f.genre,f.primary,i+2)}</div><div class="bd"><div class="bn"><span>Scene ${i+1} · ${s.label}</span><span>${s.dur}</span></div><p class="bx">${s.desc}</p></div>`;el.appendChild(d);});
+  const sg=document.getElementById("sSettings");sg.innerHTML="";f.settings.forEach(([k,v])=>{const c=document.createElement("div");c.className="setcell";c.innerHTML=`<div class="k">${k}</div><div class="v">${v}</div>`;sg.appendChild(c);});
+  document.getElementById("sDeliver").classList.remove("show");state.creator.published=false;
+  resetPlayer("sPlayer","sScrub");
+}
+function publishFilm(){
+  const f=state.creator.film;if(!f)return;state.creator.published=true;
+  document.getElementById("deliverMsg").textContent=`“${f.title}” is now in the mood library. Viewers who ask to feel ${f.moodStr.toLowerCase()} can be delivered this film instantly — no browsing.`;
+  document.getElementById("previewTh").innerHTML=poster(f.genre,f.primary,1);
+  document.getElementById("previewTitle").textContent=f.title;
+  document.getElementById("previewMood").textContent=`Matched for: ${f.moodStr} · ${f.genre.l} · ${f.dur}`;
+  document.getElementById("sDeliver").classList.add("show");
+  document.getElementById("sDeliver").scrollIntoView({behavior:"smooth",block:"center"});
+  toast("Published to the mood library — now deliverable on demand.");
+}
+function previewAsViewer(){
+  const f=state.creator.film;state.mode="consumer";
+  document.getElementById("modeLabel").textContent="Viewer";
+  state.from="Curious";state.to=f.primary;state.genre=f.genre;applyMood(f.primary);
+  state.cast=f.names.length?state.creator.cast.slice():["you"];
+  state.generated={title:f.title,dur:f.dur,mood:f.primary,genre:f.genre,namesStr:f.namesStr,names:f.names,
+    logline:f.synopsis,score:SCORE[f.primary.k],
+    beats:f.shots.slice(0,3).map(s=>({n:s.label,t:s.label,d:s.desc}))};
+  renderScene(state.generated);
+  document.getElementById("arcBadge").innerHTML=`<span>Delivered from the mood library</span>`;
+  go("c_scene");toast("This is how a viewer receives your published film.");
+}
+
+/* ======================= PLAYER ======================= */
+let players={};
+const VIDEOS={
+  calm:{type:"yt",id:"RazuWp5kSHk"},
+  inspired:{type:"file",src:"inspired.mp4"},
+  nostalgic:{type:"yt",id:"eRsGyueVLvQ"},
+  hopeful:{type:"file",src:"hopeful.mp4"},
+  thrilled:{type:"yt",id:"R6MlUcmOul8"},
+  comforted:{type:"yt",id:"0-npS2Fwj3U"},
+  empowered:{type:"yt",id:"eRsGyueVLvQ"},
+  wonder:{type:"yt",id:"Y-rmzh0PI3c"}
+};
+const VIDEO_FALLBACK={type:"yt",id:"aqz-KE-bpKQ"};
+function videoFor(mood){return (mood&&VIDEOS[mood.k])||VIDEO_FALLBACK;}
+function resetPlayer(pid,sid){const pl=document.getElementById(pid);pl.classList.remove("playing");const sc=document.getElementById(sid);if(sc)sc.style.width="0%";if(players[pid]){clearInterval(players[pid]);players[pid]=null;}}
+function togglePlay(pid){
+  const pl=document.getElementById(pid);if(pl.classList.contains("playing"))return;
+  let src;try{src=JSON.parse(pl.dataset.vid);}catch(e){src=null;}
+  if(!src)src=VIDEO_FALLBACK;
+  const holder=document.getElementById(pid==="cPlayer"?"cPoster":"sPoster");
+  if(src.type==="file"){
+    holder.insertAdjacentHTML("beforeend",`<video class="ytframe" src="${src.src}" autoplay playsinline controls></video>`);
+  }else{
+    holder.insertAdjacentHTML("beforeend",`<iframe class="ytframe" src="https://www.youtube.com/embed/${src.id}?autoplay=1&rel=0&modestbranding=1&playsinline=1" title="SoulScene — your film" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`);
+  }
+  pl.classList.add("playing");
+  toast("▸ Streaming your film — Soulful full-length playback (needs internet).");
+}
+
+/* ======================= BRANCH / MEMORIES ======================= */
+function toggleBranch(){const b=document.getElementById("cBranch");const show=!b.classList.contains("show");b.classList.toggle("show",show);if(show){const opts=["Stay in this moment longer","Follow "+state.generated.names[0]+" outside","Jump forward one year"];document.getElementById("branchOpts").innerHTML=opts.map(o=>`<button class="chip sm" onclick="toast('Branch queued — the Emotion Engine would re-generate from here (V1.0).')">${o}</button>`).join("");b.scrollIntoView({behavior:"smooth",block:"center"});}}
+function saveScene(){const s=state.generated;if(!s)return;if(!state.memories.find(m=>m.title===s.title&&m.mood.k===s.mood.k))state.memories.unshift({title:s.title,dur:s.dur,genre:s.genre,mood:s.mood,from:state.from||"—",cast:[...state.cast]});document.getElementById("memNav").style.display="inline-block";renderMemories();toast("Saved to SoulScene Memories — it'll ground your future stories.");}
+function renderMemories(){
+  const g=document.getElementById("memGrid");
+  if(!state.memories.length)g.innerHTML='<p class="emptyMem">No saved scenes yet — create one and tap “Save to Memories”.</p>';
+  else{g.innerHTML="";state.memories.forEach(m=>{const el=document.createElement("div");el.className="memcard";el.innerHTML=`<div class="still">${poster(m.genre,m.mood,3)}</div><div class="mb"><p class="mt">${m.title}</p><p class="mm">${m.genre.l} · ${m.dur} · ${m.from} ➜ ${m.mood.l}</p></div>`;g.appendChild(el);});}
+  const c=document.getElementById("memCast");c.innerHTML="";CAST.forEach(p=>{const el=document.createElement("div");el.className="card castcard";el.innerHTML=`${avatarHTML(p)}<div class="meta"><p class="ttl">${p.name}</p><p class="desc">${p.tag}</p>${p.star?'<span class="memtag star">★ Star</span>':(p.mem?'<span class="memtag">☾ Memory</span>':'<span class="memtag" style="color:var(--accent);border-color:var(--line);background:none">new</span>')}</div>`;c.appendChild(el);});
+}
+
+/* ======================= FAST CREATE MODES ======================= */
+const GENRE_FOR_MOOD={calm:"nature",inspired:"adventure",nostalgic:"slice",hopeful:"slice",thrilled:"noir",comforted:"slice",empowered:"fantasy",wonder:"scifi"};
+function enterQuick(screen){
+  state.mode="creator";document.getElementById("modePill").style.display="flex";
+  document.getElementById("modeLabel").textContent="Studio";document.getElementById("switchBtn").style.display="inline-block";
+  if(screen==="mixer")renderMixer();
+  if(screen==="timeofday"){timeSel=null;renderTime();}
+  if(screen==="twoppl")renderTwo();
+  go(screen);
+}
+function applySetup(o){const c=state.creator;c.moods=o.moods;c.genre=o.genre;c.minutes=o.minutes;c.style=o.style||"cinematic";c.music=o.music||"orchestral";c.voice=o.voice||"warm";c.aspect="16:9";c.cast=["you"];c.safe=false;c.seed="";produceFilm();}
+
+/* --- Mood Mixer --- */
+const DIMS=[{k:"calm",mood:"calm",l:"Calm"},{k:"joy",mood:"hopeful",l:"Joy"},{k:"tension",mood:"thrilled",l:"Tension"},{k:"wonder",mood:"wonder",l:"Wonder"},{k:"warmth",mood:"comforted",l:"Warmth"},{k:"melancholy",mood:"nostalgic",l:"Melancholy"}];
+const MIXCANDS=[{dim:"calm",moodk:"calm",genk:"nature",title:"Still Water, Slow Light",s:2},{dim:"wonder",moodk:"wonder",genk:"scifi",title:"A Country Made of Sky",s:3},{dim:"tension",moodk:"thrilled",genk:"noir",title:"Redline",s:4},{dim:"warmth",moodk:"comforted",genk:"slice",title:"The Kitchen Light",s:5},{dim:"joy",moodk:"hopeful",genk:"adventure",title:"North of Here",s:6},{dim:"melancholy",moodk:"nostalgic",genk:"slice",title:"Amber Light",s:7}];
+let blend={calm:55,joy:45,tension:20,wonder:60,warmth:50,melancholy:25},mixMin=3;
+function renderMixer(){
+  const el=document.getElementById("mixSliders");el.innerHTML="";
+  DIMS.forEach(d=>{const row=document.createElement("div");row.className="mixrow";row.innerHTML=`<span class="mixl">${d.l}</span><input type="range" min="0" max="100" value="${blend[d.k]}" oninput="blend['${d.k}']=+this.value;updateMix()"><span class="mixv" id="mv_${d.k}">${blend[d.k]}</span>`;el.appendChild(row);});
+  document.getElementById("mixLen").value=mixMin;document.getElementById("mixLenVal").textContent=fmtMin(mixMin);
+  updateMix();
+}
+function topDims(n){return DIMS.slice().sort((a,b)=>blend[b.k]-blend[a.k]).slice(0,n);}
+function updateMix(){
+  DIMS.forEach(d=>{const e=document.getElementById("mv_"+d.k);if(e)e.textContent=blend[d.k];});
+  const top=topDims(2),primary=MOODS_TO.find(m=>m.k===top[0].mood),second=MOODS_TO.find(m=>m.k===top[1].mood);
+  applyMood(primary);
+  document.getElementById("mixReadout").innerHTML=`Your blend reads <b>${top[0].l.toLowerCase()}-forward</b>, with <b>${top[1].l.toLowerCase()}</b> underneath → we'll target <span class="tag mood">${primary.l}</span> <span class="tag mood">${second.l}</span> in a <span class="tag">${GENRES.find(g=>g.k===GENRE_FOR_MOOD[top[0].mood]).l}</span> short.`;
+  const cands=MIXCANDS.map(c=>({...c,score:blend[c.dim]})).sort((a,b)=>b.score-a.score).slice(0,3);
+  document.getElementById("mixRerank").innerHTML=cands.map(c=>{const m=MOODS_TO.find(x=>x.k===c.moodk),g=GENRES.find(x=>x.k===c.genk);return `<div class="rritem"><div class="rrth">${poster(g,m,c.s)}</div><div><div class="rrt">${c.title}</div><div class="rrm">${m.l} · ${g.l}</div></div><div class="rrscore">${Math.round(c.score)}%</div></div>`;}).join("");
+}
+function composeMixer(){const top=topDims(2);applySetup({moods:new Set(top.map(d=>d.mood)),genre:GENRES.find(g=>g.k===GENRE_FOR_MOOD[top[0].mood]),minutes:mixMin,style:"cinematic",music:"orchestral"});}
+
+/* --- Time of day --- */
+const SLOTS=[
+  {k:"dawn",l:"Early morning",range:"5–9 AM",emoji:"🌄",mood:"hopeful",genre:"nature",style:"cinematic",min:2.5,line:"a quiet, hopeful start before the day gets loud."},
+  {k:"morning",l:"Morning",range:"9 AM–12 PM",emoji:"☀️",mood:"inspired",genre:"adventure",style:"cinematic",min:3,line:"momentum and possibility — something to set the tone."},
+  {k:"afternoon",l:"Afternoon",range:"12–5 PM",emoji:"🌤️",mood:"wonder",genre:"scifi",style:"3d",min:3.5,line:"a midday lift — curiosity and a change of scenery."},
+  {k:"golden",l:"Golden hour",range:"5–9 PM",emoji:"🌇",mood:"nostalgic",genre:"slice",style:"water",min:3,line:"warm and golden, a little tender as the light drops."},
+  {k:"late",l:"Late night",range:"9 PM–5 AM",emoji:"🌙",mood:"calm",genre:"nature",style:"cinematic",min:4,line:"slow and soft — wind down, let the noise end."}
+];
+let timeSel=null;
+function slotForHour(h){if(h>=5&&h<9)return SLOTS[0];if(h>=9&&h<12)return SLOTS[1];if(h>=12&&h<17)return SLOTS[2];if(h>=17&&h<21)return SLOTS[3];return SLOTS[4];}
+function renderTime(){
+  const now=new Date(),h=now.getHours(),auto=slotForHour(h);
+  const h12=((h+11)%12)+1,ampm=h<12?"AM":"PM",mm=String(now.getMinutes()).padStart(2,"0");
+  document.getElementById("nowClock").textContent=`${h12}:${mm} ${ampm}`;
+  document.getElementById("nowSlotLine").textContent=auto.line;
+  if(!timeSel)timeSel=auto.k;
+  const el=document.getElementById("slotGrid");el.innerHTML="";
+  SLOTS.forEach(s=>{const on=s.k===timeSel;const c=document.createElement("div");c.className="slot"+(on?" sel":"");c.innerHTML=`<div class="semoji">${s.emoji}</div><div class="sl">${s.l}</div><div class="sr">${s.range}</div>${s.k===auto.k?'<div class="snow">now</div>':""}`;c.onclick=()=>{timeSel=s.k;applyMood(MOODS_TO.find(x=>x.k===s.mood));renderTime();};el.appendChild(c);});
+  const sel=SLOTS.find(s=>s.k===timeSel),m=MOODS_TO.find(x=>x.k===sel.mood);applyMood(m);
+  document.getElementById("timeReadout").innerHTML=`For <b>${sel.l.toLowerCase()}</b> we'll create a <span class="tag mood">${m.l}</span> <span class="tag">${GENRES.find(g=>g.k===sel.genre).l}</span> <span class="tag">${fmtMin(sel.min)}</span> piece — ${sel.line}`;
+}
+function composeTime(){const s=SLOTS.find(x=>x.k===timeSel);applySetup({moods:new Set([s.mood]),genre:GENRES.find(g=>g.k===s.genre),minutes:s.min,style:s.style,music:"ambient"});}
+
+/* --- Two of you --- */
+let twoA=null,twoB=null;
+const BRIDGE={"calm+thrilled":"wonder","comforted+thrilled":"inspired","calm+empowered":"hopeful","nostalgic+thrilled":"inspired","calm+inspired":"hopeful","hopeful+thrilled":"inspired","comforted+wonder":"calm","empowered+nostalgic":"hopeful"};
+function bridgeMood(a,b){if(a.k===b.k)return a;const key=[a.k,b.k].sort().join("+");return MOODS_TO.find(m=>m.k===(BRIDGE[key]||"wonder"));}
+function renderTwo(){
+  const ra=document.getElementById("twoA"),rb=document.getElementById("twoB");ra.innerHTML="";rb.innerHTML="";
+  MOODS_TO.forEach(m=>{
+    const a=document.createElement("button");a.className="chip sm"+(twoA&&twoA.k===m.k?" sel":"");a.innerHTML=`${EMOJI[m.k]} ${m.l}`;a.onclick=()=>{twoA=m;renderTwo();};ra.appendChild(a);
+    const b=document.createElement("button");b.className="chip sm"+(twoB&&twoB.k===m.k?" sel":"");b.innerHTML=`${EMOJI[m.k]} ${m.l}`;b.onclick=()=>{twoB=m;renderTwo();};rb.appendChild(b);
+  });
+  const rd=document.getElementById("twoReadout"),btn=document.getElementById("twoBtn");
+  if(twoA&&twoB){const br=bridgeMood(twoA,twoB);applyMood(br);rd.innerHTML=(twoA.k===twoB.k?`You both want <span class="tag mood">${twoA.l}</span> — easy. `:`One wants <span class="tag mood">${twoA.l}</span>, the other <span class="tag mood">${twoB.l}</span> → `)+`we'll create a <span class="tag mood">${br.l}</span> short that lands for both.`;btn.disabled=false;}
+  else{rd.textContent="Pick a mood for each of you.";btn.disabled=true;}
+}
+function composeTwo(){const br=bridgeMood(twoA,twoB);const moods=new Set([twoA.k,twoB.k]);applySetup({moods,genre:GENRES.find(g=>g.k===GENRE_FOR_MOOD[br.k]),minutes:3.5,style:"cinematic",music:"orchestral"});}
+
+/* ======================= PRICING ======================= */
+const PLANS=[
+  {k:"free",name:"Free",tag:"Dip a toe in",movies:"3 movies / month",mo:0,yr:0,cta:"Start free",featured:false,feats:["Quick create from any mood","Up to 2-minute scenes","HD 720p","1 saved avatar (SoulScene Memories)","SoulScene watermark","Community support"]},
+  {k:"mindful",name:"Mindful",tag:"For your nightly reset",movies:"10 movies / month",mo:4.99,yr:49.90,cta:"Choose Mindful",featured:true,feats:["Everything in Free, plus:","Full Studio — storyline, actors & setup","All fast modes: Mood Mixer, Right Now, Two of You","Up to 5-minute films","Full HD 1080p · no watermark","5 personalized avatars","Personalized score & narration","Save & export your films","Email support"]},
+  {k:"soulful",name:"Soulful",tag:"Unlimited creativity",movies:"30 movies / month",mo:9.99,yr:99.90,cta:"Go Soulful",featured:false,feats:["Everything in Mindful, plus:","Cinematic 4K · full-film streaming","Unlimited avatars & full Memories continuity","Branching narratives","Family profiles & child-safe controls","Priority generation queue","Publish to the mood library","Priority support"]}
+];
+let billing="monthly";
+function setBilling(b){billing=b;document.querySelectorAll("#billToggle .bt").forEach(x=>x.classList.toggle("on",x.dataset.b===b));renderPricing();}
+function renderPricing(){
+  const grid=document.getElementById("priceGrid");if(!grid)return;grid.innerHTML="";
+  PLANS.forEach(p=>{
+    const annual=billing==="annual";
+    const price=p.mo===0?"$0":(annual?"$"+p.yr.toFixed(2):"$"+p.mo.toFixed(2));
+    const unit=p.mo===0?"free forever":(annual?"/year":"/month");
+    const sub=p.mo===0?"No card needed":(annual?"≈ $"+(p.yr/12).toFixed(2)+"/mo · billed yearly":"billed monthly");
+    const card=document.createElement("div");card.className="plan"+(p.featured?" featured":"");
+    card.innerHTML=`${p.featured?'<div class="pbadge">Most popular</div>':""}<div class="pname">${p.name}</div><div class="ptag">${p.tag}</div><div class="pprice"><span class="pnum">${price}</span><span class="punit">${unit}</span></div><div class="psub">${sub}</div><div class="pmovies">${p.movies}</div><button class="cta pcta${p.featured?"":" ghost"}" onclick="choosePlan('${p.k}')">${p.cta}</button><ul class="pfeats">${p.feats.map(featLine).join("")}</ul>`;
+    grid.appendChild(card);
+  });
+}
+function featLine(f){return /^Everything in/.test(f)?`<li class="lead">${f}</li>`:`<li><span class="pk">✓</span><span>${f}</span></li>`;}
+function choosePlan(k){
+  const p=PLANS.find(x=>x.k===k);
+  if(k==="free")toast("You're on the Free plan — 3 movies a month. (Concept demo — no checkout.)");
+  else{const price=billing==="annual"?"$"+p.yr.toFixed(2)+"/yr":"$"+p.mo.toFixed(2)+"/mo";toast("Selected the "+p.name+" plan — "+price+". Concept prototype: no real payment is taken.");}
+  [...document.querySelectorAll("#priceGrid .plan")].forEach((el,i)=>el.classList.toggle("picked",PLANS[i].k===k));
+}
+
+/* ======================= SCENE ART (SVG) ======================= */
+function mix(a,b,t){const p=x=>parseInt(x,16);const A=[p(a.slice(1,3)),p(a.slice(3,5)),p(a.slice(5,7))],B=[p(b.slice(1,3)),p(b.slice(3,5)),p(b.slice(5,7))];return "#"+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,"0")).join("");}
+function poster(g,mood,seed=1,w=800,h=450){
+  const [sky,horizon,sil]=g.pal,glow=mood.glow,acc=mood.accent,id="p"+seed+g.k;
+  const rnd=n=>{let x=Math.sin(seed*99+n)*10000;return x-Math.floor(x);};
+  const sun=`<circle cx="${140+rnd(1)*520}" cy="${90+rnd(2)*90}" r="${34+rnd(3)*26}" fill="url(#glow${id})"/>`;let art="";
+  if(g.motif==="cosmos"){let stars="";for(let i=0;i<60;i++)stars+=`<circle cx="${rnd(i)*w}" cy="${rnd(i+7)*h*.8}" r="${rnd(i+3)*1.4}" fill="#fff" opacity="${.3+rnd(i)*.6}"/>`;art=`${stars}<ellipse cx="${w*.72}" cy="${h*.42}" rx="70" ry="70" fill="${mix(sky,glow,.5)}"/><ellipse cx="${w*.72}" cy="${h*.42}" rx="120" ry="30" fill="none" stroke="${acc}" stroke-width="4" opacity=".7" transform="rotate(-18 ${w*.72} ${h*.42})"/>`;}
+  else if(g.motif==="city"){let b="",x=0;while(x<w){const bw=40+rnd(x)*60,bh=90+rnd(x+2)*220;b+=`<rect x="${x}" y="${h-bh}" width="${bw-6}" height="${bh}" fill="${mix(sil,'#000',.2)}"/>`;for(let wy=h-bh+16;wy<h-20;wy+=22)for(let wx=x+8;wx<x+bw-14;wx+=16)if(rnd(wx*wy)>.6)b+=`<rect x="${wx}" y="${wy}" width="5" height="7" fill="${glow}" opacity=".85"/>`;x+=bw;}art=`${sun}${b}`;}
+  else if(g.motif==="mountains"){const range=(base,col,jag)=>{let p=`M0 ${h} `;for(let x=0;x<=w;x+=w/6)p+=`L${x} ${base-rnd(x+jag)*jag} `;return `<path d="${p}L${w} ${h}Z" fill="${col}"/>`;};art=`${sun}${range(h*.62,mix(horizon,sil,.4),70)}${range(h*.78,mix(sil,'#000',.1),40)}`;}
+  else if(g.motif==="forest"){let trees="";for(let i=0;i<14;i++){const x=rnd(i)*w,th=90+rnd(i+2)*130,tw=24+rnd(i)*24;trees+=`<path d="M${x} ${h} L${x-tw/2} ${h-th*.6} L${x-tw/4} ${h-th*.6} L${x-tw/2} ${h-th} L${x+tw/2} ${h-th} L${x+tw/4} ${h-th*.6} L${x+tw/2} ${h-th*.6} Z" fill="${mix(sil,'#000',rnd(i)*.3)}"/>`;}art=`${sun}<rect x="0" y="${h*.4}" width="${w}" height="${h*.3}" fill="${glow}" opacity=".08"/>${trees}`;}
+  else if(g.motif==="room"){art=`<rect x="${w*.55}" y="${h*.18}" width="${w*.33}" height="${h*.6}" rx="6" fill="url(#glow${id})" opacity=".9"/><rect x="${w*.55}" y="${h*.18}" width="${w*.33}" height="${h*.6}" rx="6" fill="none" stroke="${mix(sil,'#000',.2)}" stroke-width="10"/><line x1="${w*.715}" y1="${h*.18}" x2="${w*.715}" y2="${h*.78}" stroke="${mix(sil,'#000',.2)}" stroke-width="8"/><rect x="0" y="${h*.8}" width="${w}" height="${h*.2}" fill="${mix(sil,'#000',.3)}"/>`;}
+  else{art=`${sun}<rect x="0" y="${h*.6}" width="${w}" height="${h*.4}" fill="${mix(horizon,sil,.5)}"/><rect x="${w*.42}" y="${h*.6}" width="${w*.16}" height="${h*.4}" fill="${glow}" opacity=".45"/><line x1="0" y1="${h*.6}" x2="${w}" y2="${h*.6}" stroke="${acc}" stroke-width="1.5" opacity=".5"/>`;}
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="sky${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sky}"/><stop offset="1" stop-color="${mix(horizon,sky,.3)}"/></linearGradient><radialGradient id="glow${id}" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="${mix(glow,'#ffffff',.4)}"/><stop offset="1" stop-color="${glow}" stop-opacity="0"/></radialGradient><radialGradient id="vig${id}" cx="50%" cy="45%" r="75%"><stop offset="55%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".55"/></radialGradient></defs><rect width="${w}" height="${h}" fill="url(#sky${id})"/>${art}<rect width="${w}" height="${h}" fill="url(#vig${id})"/></svg>`;
+}
+
+/* ======================= UTIL / INIT ======================= */
+let toastTimer=null;
+function toast(msg){const t=document.getElementById("toast");document.getElementById("toastMsg").textContent=msg;t.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove("show"),3400);}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")goHome();});
+(function init(){
+  const sk=document.getElementById("stars");let html="";for(let i=0;i<90;i++){const s=Math.random()*2+.5;html+=`<span class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${s}px;height:${s}px;animation-delay:${Math.random()*4}s;opacity:${Math.random()*.6+.2}"></span>`;}sk.innerHTML=html;
+  applyMood(MOODS_TO[7]);
+  renderMoodFrom();renderMoodTo();renderGenre();renderCast();renderMemories();
+  renderStudio();onLen();renderHome();renderPricing();
+  document.getElementById("castHint").textContent="1 selected · up to 3";
+})();
+</script>
+</body>
+</html>
